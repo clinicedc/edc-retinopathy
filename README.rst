@@ -1,2 +1,3 @@
-# edc-retinopathy
+edc-retinopathy
+---------------
 Interface with DRISTi
