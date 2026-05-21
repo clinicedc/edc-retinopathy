@@ -14,9 +14,15 @@ Prerequisites
 
        INSTALLED_APPS = [
            ...
+           "rest_framework",
+           "rest_framework.authtoken",
            "edc_retinopathy.apps.AppConfig",
            ...
        ]
+
+   Then run migrations to create the token table::
+
+       python manage.py migrate authtoken
 
 3. Wire the API URLs (in your project's ``urls.py``)::
 
