@@ -1,18 +1,28 @@
 from django.urls import path
 
-from .views import RetinalImageUploadView, RetinopathyResultView
+from .views import FileUploadView, PingView, ResolveSubjectView, SessionStatusView
 
 app_name = "edc_retinopathy_api"
 
 urlpatterns = [
     path(
-        "retinopathy/results/",
-        RetinopathyResultView.as_view(),
-        name="results",
+        "retinopathy/ping/",
+        PingView.as_view(),
+        name="ping",
     ),
     path(
-        "retinopathy/images/",
-        RetinalImageUploadView.as_view(),
-        name="images",
+        "retinopathy/resolve/",
+        ResolveSubjectView.as_view(),
+        name="resolve-subject",
+    ),
+    path(
+        "retinopathy/<str:subject_identifier>/status/",
+        SessionStatusView.as_view(),
+        name="session-status",
+    ),
+    path(
+        "retinopathy/<str:subject_identifier>/<str:file_type>/",
+        FileUploadView.as_view(),
+        name="file-upload",
     ),
 ]

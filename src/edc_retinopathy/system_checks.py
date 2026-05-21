@@ -1,10 +1,9 @@
 from __future__ import annotations
 
 from pathlib import Path
-from warnings import Warning as CheckWarning  # noqa: A004
 
 from django.conf import settings
-from django.core.checks import Error
+from django.core.checks import Error, Warning as CheckWarning
 
 
 def storage_dir_check(**kwargs: object) -> list:  # noqa: ARG001

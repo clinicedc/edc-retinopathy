@@ -2,43 +2,39 @@ from __future__ import annotations
 
 from rest_framework import serializers
 
-from ..models import RetinalImage, RetinopathyResult
+SEX_CHOICES = ("M", "F")
 
 
-class RetinopathyResultSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = RetinopathyResult
-        fields = [
-            "id",
-            "subject_identifier",
-            "image_date",
-            "eye",
-            "grading",
-            "analysis_data",
-            "device_id",
-            "site_id",
-            "received_datetime",
-        ]
-        read_only_fields = ["id", "received_datetime"]
+class UpperCaseChoiceField(serializers.ChoiceField):
+    """ChoiceField that normalises input to uppercase before validation."""
+
+    def to_internal_value(self, data: str) -> str:
+        if isinstance(data, str):
+            data = data.upper()
+        return super().to_internal_value(data)
 
 
-class RetinalImageSerializer(serializers.Serializer):
-    """Handles multipart image upload linked to a RetinopathyResult."""
+class ResolveSubjectSerializer(serializers.Serializer):
+    """Validates the resolve-subject payload from the camera."""
 
-    result_id = serializers.IntegerField(
-        help_text="ID of the RetinopathyResult this image belongs to.",
+    subject_identifier = serializers.CharField(max_length=50)
+    initials = serializers.CharField(max_length=10)
+    sex = UpperCaseChoiceField(choices=SEX_CHOICES)
+    age = serializers.IntegerField(required=False, default=None)
+    device_id = serializers.CharField(max_length=100, required=False, default="")
+    site_id = serializers.CharField(max_length=50, required=False, default="")
+
+
+class FileUploadSerializer(serializers.Serializer):
+    """Validates the file upload payload (left eye, right eye, or report)."""
+
+    file = serializers.FileField(help_text="The image or report file.")
+    capture_datetime = serializers.DateTimeField(
+        help_text="Capture timestamp as reported by the camera.",
     )
-    eye = serializers.ChoiceField(
-        choices=RetinalImage.eye.field.choices,
-        help_text="Which eye: L, R, or B.",
+    checksum = serializers.CharField(
+        max_length=64,
+        required=False,
+        default="",
+        help_text="SHA-256 hex digest of the file for integrity verification.",
     )
-    image = serializers.ImageField(
-        help_text="The retinal image file.",
-    )
-
-    def validate_result_id(self, value: int) -> int:
-        if not RetinopathyResult.objects.filter(pk=value).exists():
-            raise serializers.ValidationError(
-                f"RetinopathyResult with id={value} does not exist."
-            )
-        return value

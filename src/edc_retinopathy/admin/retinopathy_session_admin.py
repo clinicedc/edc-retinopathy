@@ -2,33 +2,37 @@ from __future__ import annotations
 
 from django.contrib import admin
 
-from ..models import RetinopathyResult
+from ..models import RetinopathySession
 
 
-@admin.register(RetinopathyResult)
-class RetinopathyResultAdmin(admin.ModelAdmin):
+@admin.register(RetinopathySession)
+class RetinopathySessionAdmin(admin.ModelAdmin):
     list_display = [
         "subject_identifier",
-        "image_date",
-        "eye",
-        "grading",
+        "initials",
+        "sex",
+        "age",
         "device_id",
         "site_id",
-        "received_datetime",
+        "file_count",
+        "created_datetime",
     ]
-    list_filter = ["eye", "site_id", "device_id", "image_date"]
-    search_fields = ["subject_identifier", "grading"]
+    list_filter = ["site_id", "device_id", "created_datetime"]
+    search_fields = ["subject_identifier", "initials"]
     readonly_fields = [
         "subject_identifier",
-        "image_date",
-        "eye",
-        "grading",
-        "analysis_data",
+        "initials",
+        "sex",
+        "age",
         "device_id",
         "site_id",
-        "received_datetime",
+        "created_datetime",
     ]
-    date_hierarchy = "image_date"
+    date_hierarchy = "created_datetime"
+
+    @admin.display(description="Files")
+    def file_count(self, obj: RetinopathySession) -> int:
+        return obj.files.count()
 
     def has_add_permission(self, request: object) -> bool:  # noqa: ARG002
         return False

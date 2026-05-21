@@ -1,7 +1,7 @@
 from .retinal_image import RetinalImage
-from .retinopathy_result import RetinopathyResult
+from .retinopathy_session import RetinopathySession
 
 __all__ = [
     "RetinalImage",
-    "RetinopathyResult",
+    "RetinopathySession",
 ]
