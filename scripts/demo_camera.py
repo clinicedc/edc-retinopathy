@@ -6,11 +6,11 @@ Usage:
         --subject 105-10-0001-2 --initials JD --sex M --age 35
 
     # Minimal (uses defaults for optional fields):
-    python demo_camera.py --host http://localhost:8000 --token abc123 \  # ggignore
+    python demo_camera.py --host http://localhost:8000 --token abc123 \\ # ggignore
         --subject 105-10-0001-2 --initials JD --sex M
 
     # With real image files:
-    python demo_camera.py --host http://localhost:8000 --token abc123 \  # ggignore
+    python demo_camera.py --host http://localhost:8000 --token abc123 \\ # ggignore
         --subject 105-10-0001-2 --initials JD --sex M \
         --left-image /path/to/left.jpg \
         --right-image /path/to/right.jpg \
@@ -101,15 +101,16 @@ def main() -> None:
     if args.site_id:
         payload["site_id"] = args.site_id
 
-    r = requests.post(
-        f"{base}/resolve/", json=payload, headers=headers, timeout=10
-    )
+    r = requests.post(f"{base}/resolve/", json=payload, headers=headers, timeout=10)
     if r.status_code in (200, 201):
         data = r.json()
         session_id = data["session_id"]
         reactivated = data.get("reactivated", False)
         label = "reactivated" if reactivated else "created"
-        print(f"OK — session {session_id} ({label})")
+        print(
+            f"OK — {data['subject_identifier']}, "
+            f"session {session_id} ({label})"
+        )
     else:
         print(f"FAILED {r.status_code}: {r.text}")
         sys.exit(1)
@@ -146,15 +147,11 @@ def main() -> None:
             form_data["checksum"] = (None, sha256_bytes(file_data))
 
         url = f"{base}/{args.subject}/{file_type}/?session_id={session_id}"
-        r = requests.post(
-            url, files=files, data=form_data, headers=headers, timeout=30
-        )
+        r = requests.post(url, files=files, data=form_data, headers=headers, timeout=30)
         if r.status_code in (200, 201):
             data = r.json()
             status_label = "new" if r.status_code == 201 else "already exists"
-            print(
-                f"OK — {data['stored_filename']} ({status_label})"
-            )
+            print(f"OK — {data['stored_filename']} ({status_label})")
         else:
             print(f"FAILED {r.status_code}: {r.text}")
             continue
@@ -162,12 +159,11 @@ def main() -> None:
     # --- Final: Check status ---
     print()
     print("Session status ...", end=" ", flush=True)
-    r = requests.get(
-        f"{base}/{args.subject}/status/", headers=headers, timeout=10
-    )
+    r = requests.get(f"{base}/{args.subject}/status/", headers=headers, timeout=10)
     if r.status_code == 200:
         data = r.json()
         print(f"OK")
+        print(f"  Subject:  {data['subject_identifier']}")
         print(f"  Session:  {data['session_id']}")
         print(f"  Uploaded: {data['uploaded']}")
         print(f"  Missing:  {data['missing']}")
