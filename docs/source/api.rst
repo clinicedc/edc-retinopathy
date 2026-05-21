@@ -295,13 +295,17 @@ Success response (201)
      "stored_filename": "8f3a9b2c1d4e5f6a7b8c9d0e1f2a3b4c.jpg"
    }
 
-Retry behaviour
-^^^^^^^^^^^^^^^
+Re-upload behaviour
+^^^^^^^^^^^^^^^^^^^
 
 If the same file type has already been uploaded for the current session,
-the server returns ``200 OK`` with the existing record. This makes
-uploads **idempotent** — the camera can safely retry after a network
-timeout without creating duplicates.
+re-uploading **replaces** the existing file. The old file is deleted from
+disk, the old record is removed, and the new file is saved. The server
+returns ``201 Created`` with the new record.
+
+This allows the camera to correct a capture (e.g. with a different
+``capture_datetime``) by simply re-sending — the latest upload always wins.
+Only one file per type per session is stored at any time.
 
 
 Step 3: Upload Right Eye Image
@@ -512,8 +516,9 @@ One record per uploaded file, linked to a session.
      - DateTimeField
      - Timestamp of upload (auto).
 
-**Constraints:** A unique constraint on ``(session, file_type)`` prevents
-duplicate uploads of the same type within a session.
+**Constraints:** A unique constraint on ``(session, file_type)`` ensures
+at most one file per type per session. Re-uploading replaces the existing
+file (the old record is deleted before the new one is created).
 
 
 Django Configuration
