@@ -5,24 +5,36 @@ from typing import ClassVar
 
 from django.db import models
 
-from .retinopathy_result import EYE_CHOICES
+LEFT_EYE = "left"
+RIGHT_EYE = "right"
+REPORT = "report"
+
+FILE_TYPE_CHOICES = [
+    (LEFT_EYE, "Left eye"),
+    (RIGHT_EYE, "Right eye"),
+    (REPORT, "Report"),
+]
 
 
 class RetinalImage(models.Model):
-    """Stores metadata for retinal image files received from the camera."""
+    """Stores metadata for files received from the retinopathy camera.
+
+    Each file is linked to a RetinopathySession and categorised as
+    a left-eye image, right-eye image, or report PDF.
+    """
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
 
-    result = models.ForeignKey(
-        "edc_retinopathy.RetinopathyResult",
+    session = models.ForeignKey(
+        "edc_retinopathy.RetinopathySession",
         on_delete=models.PROTECT,
-        related_name="images",
+        related_name="files",
     )
 
-    eye = models.CharField(
-        max_length=1,
-        choices=EYE_CHOICES,
-        help_text="Which eye this image is for.",
+    file_type = models.CharField(
+        max_length=10,
+        choices=FILE_TYPE_CHOICES,
+        help_text="Category of this file: left eye, right eye, or report.",
     )
 
     original_filename = models.CharField(
@@ -40,7 +52,7 @@ class RetinalImage(models.Model):
         max_length=100,
         blank=True,
         default="",
-        help_text="MIME type of the uploaded image (e.g. image/jpeg).",
+        help_text="MIME type of the uploaded file (e.g. image/jpeg, application/pdf).",
     )
 
     file_size = models.PositiveIntegerField(
@@ -54,6 +66,12 @@ class RetinalImage(models.Model):
         ordering: ClassVar = ["-received_datetime"]
         verbose_name = "Retinal Image"
         verbose_name_plural = "Retinal Images"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["session", "file_type"],
+                name="unique_session_file_type",
+            ),
+        ]
 
     def __str__(self) -> str:
-        return f"{self.original_filename} ({self.get_eye_display()})"
+        return f"{self.original_filename} ({self.get_file_type_display()})"

@@ -1,18 +1,18 @@
 from django.urls import path
 
-from .views import RetinalImageUploadView, RetinopathyResultView
+from .views import FileUploadView, ResolveSubjectView
 
 app_name = "edc_retinopathy_api"
 
 urlpatterns = [
     path(
-        "retinopathy/results/",
-        RetinopathyResultView.as_view(),
-        name="results",
+        "retinopathy/resolve/",
+        ResolveSubjectView.as_view(),
+        name="resolve-subject",
     ),
     path(
-        "retinopathy/images/",
-        RetinalImageUploadView.as_view(),
-        name="images",
+        "retinopathy/<str:subject_identifier>/<str:file_type>/",
+        FileUploadView.as_view(),
+        name="file-upload",
     ),
 ]

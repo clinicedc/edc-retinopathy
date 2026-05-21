@@ -9,18 +9,18 @@ from ..models import RetinalImage
 class RetinalImageAdmin(admin.ModelAdmin):
     list_display = [
         "original_filename",
-        "eye",
-        "result",
+        "file_type",
+        "session",
         "content_type",
         "file_size",
         "received_datetime",
     ]
-    list_filter = ["eye", "content_type"]
-    search_fields = ["original_filename", "result__subject_identifier"]
+    list_filter = ["file_type", "content_type"]
+    search_fields = ["original_filename", "session__subject_identifier"]
     readonly_fields = [
         "id",
-        "result",
-        "eye",
+        "session",
+        "file_type",
         "original_filename",
         "stored_filename",
         "content_type",
