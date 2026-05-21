@@ -6,11 +6,11 @@ Usage:
         --subject 105-10-0001-2 --initials JD --sex M --age 35
 
     # Minimal (uses defaults for optional fields):
-    python demo_camera.py --host http://localhost:8000 --token abc123 \
+    python demo_camera.py --host http://localhost:8000 --token abc123 \  # ggignore
         --subject 105-10-0001-2 --initials JD --sex M
 
     # With real image files:
-    python demo_camera.py --host http://localhost:8000 --token abc123 \
+    python demo_camera.py --host http://localhost:8000 --token abc123 \  # ggignore
         --subject 105-10-0001-2 --initials JD --sex M \
         --left-image /path/to/left.jpg \
         --right-image /path/to/right.jpg \

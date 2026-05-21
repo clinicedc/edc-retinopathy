@@ -602,7 +602,7 @@ Using ``curl`` to demonstrate the complete protocol:
 
 .. code-block:: bash
 
-   TOKEN="9944b09199c62bcf9418ad846dd0e4bbdfc6ee4b"
+   TOKEN="9944b09199c62bcf9418ad846dd0e4bbdfc6ee4b"  # ggignore
    BASE="https://edc.example.com/api/retinopathy"
 
    # Step 0: Verify connectivity
