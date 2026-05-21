@@ -184,26 +184,51 @@ class FullWorkflowTests(TestCase):
         self.assertEqual(s2.files.count(), 1)
 
     def test_workflow_repeat_visit_new_session(self) -> None:
-        """A second resolve creates a new session; uploads go to the latest."""
-        # First visit
+        """After completing a session, a new resolve creates a new session."""
+        # First visit — complete it
         r1 = self._resolve()
         session1_id = r1["session_id"]
         self._upload("left")
+        self._upload("right")
+        self._upload("report")
 
-        # Second visit (new session)
+        # Second visit — new session since first is complete
         r2 = self._resolve()
         session2_id = r2["session_id"]
         self.assertNotEqual(session1_id, session2_id)
+        self.assertFalse(r2.get("reactivated", False))
 
-        # Upload left eye again — goes to session 2
+        # Upload left eye — goes to session 2
         left_data = self._upload("left")
         self.assertEqual(left_data["session_id"], session2_id)
 
-        # Session 1 has 1 file, session 2 has 1 file
-        s1 = RetinopathySession.objects.get(pk=session1_id)
-        s2 = RetinopathySession.objects.get(pk=session2_id)
-        self.assertEqual(s1.files.count(), 1)
-        self.assertEqual(s2.files.count(), 1)
+    def test_workflow_reactivation_after_disconnect(self) -> None:
+        """Camera disconnects mid-workflow, reconnects, and resumes."""
+        # Resolve and upload left eye
+        r1 = self._resolve()
+        session_id = r1["session_id"]
+        self._upload("left")
+
+        # Camera disconnects ... reconnects and resolves again
+        r2 = self._resolve()
+        self.assertEqual(r2["session_id"], session_id)
+        self.assertTrue(r2["reactivated"])
+
+        # Check status to see what's done
+        status_resp = self.client.get(
+            "/api/retinopathy/105-10-0001-2/status/"
+        )
+        self.assertEqual(status_resp.data["uploaded"], ["left"])
+
+        # Continue with right eye and report
+        self._upload("right")
+        self._upload("report")
+
+        # Session is now complete
+        status_resp = self.client.get(
+            "/api/retinopathy/105-10-0001-2/status/"
+        )
+        self.assertTrue(status_resp.data["complete"])
 
     def test_workflow_retry_after_timeout(self) -> None:
         """Camera retries an upload after a network timeout; gets 200."""

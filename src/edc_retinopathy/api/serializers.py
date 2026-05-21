@@ -32,3 +32,9 @@ class FileUploadSerializer(serializers.Serializer):
     capture_datetime = serializers.DateTimeField(
         help_text="Capture timestamp as reported by the camera.",
     )
+    checksum = serializers.CharField(
+        max_length=64,
+        required=False,
+        default="",
+        help_text="SHA-256 hex digest of the file for integrity verification.",
+    )

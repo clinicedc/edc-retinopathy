@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import logging
 import os
 import tempfile
@@ -28,7 +29,7 @@ _PDF_MAGIC = b"%PDF"
 
 # Default settings
 _DEFAULT_MAX_FILE_SIZE_MB = 10
-_DEFAULT_SESSION_EXPIRE_MINUTES = 30
+_DEFAULT_SESSION_EXPIRE_MINUTES = 120
 
 
 def _get_max_file_size_bytes() -> int:
@@ -125,6 +126,15 @@ def _validate_file_content(
     return None
 
 
+def _compute_sha256(file_path: str) -> str:
+    """Compute SHA-256 hex digest of a file on disk."""
+    h = hashlib.sha256()
+    with open(file_path, "rb") as f:
+        for chunk in iter(lambda: f.read(65536), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
 def _image_response_data(retinal_image: RetinalImage) -> dict:
     """Build the standard response payload for a RetinalImage."""
     return {
@@ -134,6 +144,46 @@ def _image_response_data(retinal_image: RetinalImage) -> dict:
         "original_filename": retinal_image.original_filename,
         "stored_filename": retinal_image.stored_filename,
     }
+
+
+def _find_session(
+    subject_identifier: str,
+    session_id: int | None = None,
+) -> RetinopathySession | None:
+    """Find an active session by subject_identifier.
+
+    If session_id is provided, look up that specific session (no expiry
+    check — the caller explicitly chose it). Otherwise find the most
+    recent non-expired session.
+    """
+    if session_id is not None:
+        return (
+            RetinopathySession.objects.filter(
+                pk=session_id,
+                subject_identifier=subject_identifier,
+            )
+            .first()
+        )
+    expire_minutes = _get_session_expire_minutes()
+    cutoff = timezone.now() - timedelta(minutes=expire_minutes)
+    return (
+        RetinopathySession.objects.filter(
+            subject_identifier=subject_identifier,
+            created_datetime__gte=cutoff,
+        )
+        .order_by("-created_datetime")
+        .first()
+    )
+
+
+def _server_error_response(message: str) -> Response:
+    """Return a 500 response with Retry-After header."""
+    response = Response(
+        {"code": "server_error", "error": message},
+        status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+    )
+    response["Retry-After"] = "30"
+    return response
 
 
 class PingView(APIView):
@@ -154,8 +204,10 @@ class ResolveSubjectView(APIView):
     """Resolve and validate a subject identifier from the camera.
 
     POST /api/retinopathy/resolve/
-    Body: JSON with subject_identifier, initials, sex, age.
-    Returns: confirmed subject_identifier and session_id.
+
+    If an incomplete session already exists for this subject (created
+    within the last 24 hours), it is reactivated instead of creating a
+    new one. This handles reconnection after an outage.
     """
 
     authentication_classes = [TokenAuthentication]
@@ -188,6 +240,39 @@ class ResolveSubjectView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        # --- Try to reactivate an incomplete session (within 24 hours) ---
+        reactivation_cutoff = timezone.now() - timedelta(hours=24)
+        existing_session = (
+            RetinopathySession.objects.filter(
+                subject_identifier=subject_identifier,
+                created_datetime__gte=reactivation_cutoff,
+            )
+            .order_by("-created_datetime")
+            .first()
+        )
+        if existing_session:
+            uploaded = set(
+                existing_session.files.values_list("file_type", flat=True)
+            )
+            if uploaded != {"left", "right", "report"}:
+                # Incomplete — reactivate it
+                logger.info(
+                    "Reactivating session %s for %s (device=%s, uploaded=%s)",
+                    existing_session.pk,
+                    subject_identifier,
+                    device_id,
+                    sorted(uploaded),
+                )
+                return Response(
+                    {
+                        "subject_identifier": existing_session.subject_identifier,
+                        "session_id": existing_session.pk,
+                        "reactivated": True,
+                    },
+                    status=status.HTTP_200_OK,
+                )
+
+        # --- Create new session ---
         session = RetinopathySession.objects.create(
             subject_identifier=subject_identifier,
             initials=data["initials"],
@@ -208,6 +293,7 @@ class ResolveSubjectView(APIView):
             {
                 "subject_identifier": session.subject_identifier,
                 "session_id": session.pk,
+                "reactivated": False,
             },
             status=status.HTTP_201_CREATED,
         )
@@ -268,8 +354,13 @@ class FileUploadView(APIView):
     POST /api/retinopathy/<subject_identifier>/left/
     POST /api/retinopathy/<subject_identifier>/right/
     POST /api/retinopathy/<subject_identifier>/report/
-    Body: multipart/form-data with 'file' field and optional
-    'capture_datetime'.
+
+    Query params:
+        session_id (optional): Target a specific session instead of the
+            most recent one. Useful after reconnection.
+
+    Body: multipart/form-data with 'file', 'capture_datetime', and
+    optional 'checksum' (SHA-256 hex digest) fields.
     """
 
     authentication_classes = [TokenAuthentication]
@@ -296,6 +387,7 @@ class FileUploadView(APIView):
 
         uploaded_file = serializer.validated_data["file"]
         capture_datetime = serializer.validated_data["capture_datetime"]
+        checksum = serializer.validated_data.get("checksum", "")
 
         # --- File size check ---
         max_size = _get_max_file_size_bytes()
@@ -333,26 +425,25 @@ class FileUploadView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # --- Find most recent non-expired session ---
-        expire_minutes = _get_session_expire_minutes()
-        cutoff = timezone.now() - timedelta(minutes=expire_minutes)
-        session = (
-            RetinopathySession.objects.filter(
-                subject_identifier=subject_identifier,
-                created_datetime__gte=cutoff,
-            )
-            .order_by("-created_datetime")
-            .first()
-        )
+        # --- Find session (by explicit session_id or most recent) ---
+        raw_session_id = request.query_params.get("session_id")
+        session_id = int(raw_session_id) if raw_session_id else None
+
+        session = _find_session(subject_identifier, session_id=session_id)
         if not session:
+            expire_minutes = _get_session_expire_minutes()
+            error_msg = "No active session found. Call resolve first."
+            if session_id:
+                error_msg = (
+                    f"Session {session_id} not found for "
+                    f"subject {subject_identifier}."
+                )
+            else:
+                error_msg += (
+                    f" Sessions expire after {expire_minutes} minutes."
+                )
             return Response(
-                {
-                    "code": "no_session",
-                    "error": (
-                        "No active session found. Call resolve first. "
-                        f"Sessions expire after {expire_minutes} minutes."
-                    ),
-                },
+                {"code": "no_session", "error": error_msg},
                 status=status.HTTP_404_NOT_FOUND,
             )
 
@@ -390,12 +481,41 @@ class FileUploadView(APIView):
                     out.write(chunk)
             os.rename(tmp_path, str(dest))
         except BaseException:
-            # Clean up temp file on any failure
             try:
                 os.unlink(tmp_path)
             except OSError:
                 pass
             raise
+
+        # --- Checksum verification ---
+        if checksum:
+            actual_hash = _compute_sha256(str(dest))
+            if actual_hash != checksum.lower():
+                # Delete the corrupt file
+                try:
+                    os.unlink(str(dest))
+                except OSError:
+                    pass
+                logger.warning(
+                    "Checksum mismatch for %s/%s session=%s: "
+                    "expected %s, got %s",
+                    subject_identifier,
+                    file_type,
+                    session.pk,
+                    checksum.lower(),
+                    actual_hash,
+                )
+                return Response(
+                    {
+                        "code": "checksum_mismatch",
+                        "error": (
+                            "File integrity check failed. "
+                            f"Expected SHA-256 {checksum}, "
+                            f"got {actual_hash}."
+                        ),
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
 
         retinal_image = RetinalImage.objects.create(
             session=session,

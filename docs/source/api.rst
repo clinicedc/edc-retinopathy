@@ -81,8 +81,12 @@ Success response (200)
 Step 1: Resolve Subject
 -----------------------
 
-Validates the subject identifier against ``RegisteredSubject`` and creates
-a new session record that groups all subsequent uploads.
+Validates the subject identifier against ``RegisteredSubject``. If an
+incomplete session already exists for this subject (created within the
+last 24 hours), it is **reactivated** instead of creating a new one.
+This allows the camera to resume after a disconnect without losing
+progress. A new session is created only when no recent incomplete session
+exists.
 
 .. list-table::
    :widths: 20 80
@@ -130,19 +134,32 @@ Request body
      - No
      - Study site identifier.
 
-Success response (201)
-^^^^^^^^^^^^^^^^^^^^^^
+Success response (201 Created / 200 Reactivated)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+New session:
 
 .. code-block:: json
 
    {
      "subject_identifier": "105-10-0001-2",
-     "session_id": 42
+     "session_id": 42,
+     "reactivated": false
    }
 
-The ``session_id`` is used internally to link uploads. The camera does not
-need to track it; subsequent uploads are matched by ``subject_identifier``
-to the most recent active session.
+Reactivated session (incomplete session found within 24 hours):
+
+.. code-block:: json
+
+   {
+     "subject_identifier": "105-10-0001-2",
+     "session_id": 42,
+     "reactivated": true
+   }
+
+The ``session_id`` can be used in subsequent uploads via the
+``?session_id=`` query parameter to target a specific session. If
+omitted, uploads are matched to the most recent active session.
 
 Error response (400)
 ^^^^^^^^^^^^^^^^^^^^
@@ -230,6 +247,9 @@ Step 2: Upload Left Eye Image
 
    * - **URL**
      - ``POST /api/retinopathy/<subject_identifier>/left/``
+   * - **Query params**
+     - ``?session_id=42`` (optional) — target a specific session instead
+       of the most recent one. Useful after reconnection.
    * - **Content-Type**
      - ``multipart/form-data``
    * - **Auth**
@@ -254,6 +274,13 @@ Request body
      - ISO 8601
      - Yes
      - Timestamp when the image was captured by the camera.
+   * - ``checksum``
+     - string
+     - No
+     - SHA-256 hex digest of the file. When provided, the server verifies
+       the file integrity after writing to disk. If the hash does not
+       match, the file is deleted and ``400`` is returned with code
+       ``checksum_mismatch``.
 
 Success response (201)
 ^^^^^^^^^^^^^^^^^^^^^^
@@ -339,6 +366,10 @@ Every error response includes a ``code`` field for programmatic handling.
    * - ``file_too_large``
      - 400
      - File exceeds the configured maximum size.
+   * - ``checksum_mismatch``
+     - 400
+     - SHA-256 of the stored file does not match the provided checksum.
+       The file was deleted; retry the upload.
    * - ``no_session``
      - 404
      - No active session found. Either resolve was not called, or the
@@ -528,9 +559,10 @@ Optional settings:
    # Maximum upload file size in MB (default: 10)
    EDC_RETINOPATHY_MAX_FILE_SIZE_MB = 10
 
-   # Session expiry in minutes (default: 30).
-   # Uploads to sessions older than this are rejected.
-   EDC_RETINOPATHY_SESSION_EXPIRE_MINUTES = 30
+   # Session expiry in minutes (default: 120).
+   # Uploads to sessions older than this are rejected (unless session_id
+   # is specified explicitly in the query string).
+   EDC_RETINOPATHY_SESSION_EXPIRE_MINUTES = 120
 
 Logging
 =======
@@ -589,14 +621,16 @@ Using ``curl`` to demonstrate the complete protocol:
        "site_id": "SITE-A"
      }'
 
-   # Step 2: Upload left eye image
+   # Step 2: Upload left eye image (with checksum for integrity)
+   CHECKSUM=$(sha256sum /path/to/left_eye.jpg | cut -d' ' -f1)
    curl -X POST $BASE/105-10-0001-2/left/ \
      -H "Authorization: Token $TOKEN" \
      -F "file=@/path/to/left_eye.jpg" \
-     -F "capture_datetime=2026-05-21T10:30:00Z"
+     -F "capture_datetime=2026-05-21T10:30:00Z" \
+     -F "checksum=$CHECKSUM"
 
-   # Step 3: Upload right eye image
-   curl -X POST $BASE/105-10-0001-2/right/ \
+   # Step 3: Upload right eye image (targeting a specific session)
+   curl -X POST "$BASE/105-10-0001-2/right/?session_id=42" \
      -H "Authorization: Token $TOKEN" \
      -F "file=@/path/to/right_eye.jpg" \
      -F "capture_datetime=2026-05-21T10:31:00Z"
@@ -604,7 +638,8 @@ Using ``curl`` to demonstrate the complete protocol:
    # Step 4: Upload report PDF
    curl -X POST $BASE/105-10-0001-2/report/ \
      -H "Authorization: Token $TOKEN" \
-     -F "file=@/path/to/report.pdf"
+     -F "file=@/path/to/report.pdf" \
+     -F "capture_datetime=2026-05-21T10:32:00Z"
 
    # Check session status at any point
    curl -H "Authorization: Token $TOKEN" \

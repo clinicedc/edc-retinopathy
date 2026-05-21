@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 from datetime import date, timedelta
 from pathlib import Path
 
@@ -311,6 +312,7 @@ class FileSizeLimitTests(FileUploadBaseTestCase):
 class SessionExpiryTests(FileUploadBaseTestCase):
     """Tests for session staleness guard."""
 
+    @override_settings(EDC_RETINOPATHY_SESSION_EXPIRE_MINUTES=30)
     def test_expired_session_not_found(self) -> None:
         """Upload to a session older than expire minutes returns 404."""
         old_time = timezone.now() - timedelta(minutes=60)
@@ -514,3 +516,135 @@ class FileUploadEdgeCaseTests(FileUploadBaseTestCase):
         )
         img = RetinalImage.objects.get()
         self.assertTrue(img.stored_filename.endswith(".jpg"))
+
+
+class ChecksumTests(FileUploadBaseTestCase):
+    """Tests for SHA-256 checksum verification."""
+
+    def _sha256(self, content: bytes) -> str:
+        return hashlib.sha256(content).hexdigest()
+
+    def test_correct_checksum_accepted(self) -> None:
+        """Upload with matching checksum succeeds."""
+        content = b"\xff\xd8\xff\xe0" + b"\x00" * 100
+        response = self.client.post(
+            self._upload_url("left"),
+            {
+                "file": SimpleUploadedFile("left.jpg", content, "image/jpeg"),
+                "capture_datetime": CAPTURE_DT,
+                "checksum": self._sha256(content),
+            },
+            format="multipart",
+        )
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(RetinalImage.objects.count(), 1)
+
+    def test_wrong_checksum_rejected(self) -> None:
+        """Upload with mismatched checksum returns 400 and no DB record."""
+        content = b"\xff\xd8\xff\xe0" + b"\x00" * 100
+        # Count files before upload
+        storage = Path(settings.EDC_RETINOPATHY_STORAGE_DIR) / "images"
+        files_before = set(storage.iterdir())
+
+        response = self.client.post(
+            self._upload_url("left"),
+            {
+                "file": SimpleUploadedFile("left.jpg", content, "image/jpeg"),
+                "capture_datetime": CAPTURE_DT,
+                "checksum": "0" * 64,
+            },
+            format="multipart",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.data["code"], "checksum_mismatch")
+        self.assertEqual(RetinalImage.objects.count(), 0)
+
+        # Verify the corrupt file was cleaned up (no new files on disk)
+        files_after = set(storage.iterdir())
+        new_files = files_after - files_before
+        self.assertEqual(len(new_files), 0)
+
+    def test_checksum_is_optional(self) -> None:
+        """Upload without checksum still succeeds (no verification)."""
+        response = self.client.post(
+            self._upload_url("left"),
+            {"file": _make_image_file(), "capture_datetime": CAPTURE_DT},
+            format="multipart",
+        )
+        self.assertEqual(response.status_code, 201)
+
+    def test_checksum_case_insensitive(self) -> None:
+        """Checksum comparison is case-insensitive."""
+        content = b"\xff\xd8\xff\xe0" + b"\x00" * 100
+        response = self.client.post(
+            self._upload_url("left"),
+            {
+                "file": SimpleUploadedFile("left.jpg", content, "image/jpeg"),
+                "capture_datetime": CAPTURE_DT,
+                "checksum": self._sha256(content).upper(),
+            },
+            format="multipart",
+        )
+        self.assertEqual(response.status_code, 201)
+
+
+class SessionIdParamTests(FileUploadBaseTestCase):
+    """Tests for explicit session_id query parameter."""
+
+    def test_upload_to_specific_session(self) -> None:
+        """Upload with ?session_id targets that session."""
+        older = self.session
+        RetinopathySession.objects.create(
+            subject_identifier=self.subject_id,
+            initials="JD",
+            sex="M",
+        )
+        # Upload to the OLDER session explicitly
+        url = f"{self._upload_url('left')}?session_id={older.pk}"
+        response = self.client.post(
+            url,
+            {"file": _make_image_file(), "capture_datetime": CAPTURE_DT},
+            format="multipart",
+        )
+        self.assertEqual(response.status_code, 201)
+        img = RetinalImage.objects.get()
+        self.assertEqual(img.session, older)
+
+    def test_invalid_session_id_returns_404(self) -> None:
+        """Non-existent session_id returns 404."""
+        url = f"{self._upload_url('left')}?session_id=99999"
+        response = self.client.post(
+            url,
+            {"file": _make_image_file(), "capture_datetime": CAPTURE_DT},
+            format="multipart",
+        )
+        self.assertEqual(response.status_code, 404)
+
+    def test_session_id_wrong_subject_returns_404(self) -> None:
+        """session_id for a different subject returns 404."""
+        other_session = RetinopathySession.objects.create(
+            subject_identifier="105-10-0099-9",
+            initials="ZZ",
+            sex="F",
+        )
+        url = f"{self._upload_url('left')}?session_id={other_session.pk}"
+        response = self.client.post(
+            url,
+            {"file": _make_image_file(), "capture_datetime": CAPTURE_DT},
+            format="multipart",
+        )
+        self.assertEqual(response.status_code, 404)
+
+    def test_session_id_bypasses_expiry(self) -> None:
+        """Explicit session_id is not subject to expiry check."""
+        old_time = timezone.now() - timedelta(hours=12)
+        RetinopathySession.objects.filter(pk=self.session.pk).update(
+            created_datetime=old_time
+        )
+        url = f"{self._upload_url('left')}?session_id={self.session.pk}"
+        response = self.client.post(
+            url,
+            {"file": _make_image_file(), "capture_datetime": CAPTURE_DT},
+            format="multipart",
+        )
+        self.assertEqual(response.status_code, 201)

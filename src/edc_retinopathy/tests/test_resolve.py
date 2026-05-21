@@ -2,14 +2,15 @@
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, timedelta
 
 from django.contrib.auth.models import User
 from django.test import TestCase
+from django.utils import timezone
 from rest_framework.authtoken.models import Token
 from rest_framework.test import APIClient
 
-from ..models import RetinopathySession
+from ..models import RetinalImage, RetinopathySession
 from .models import RegisteredSubject
 
 
@@ -46,6 +47,7 @@ class ResolveSubjectTests(TestCase):
             response.data["subject_identifier"], "105-10-0001-2"
         )
         self.assertIn("session_id", response.data)
+        self.assertFalse(response.data["reactivated"])
         self.assertEqual(RetinopathySession.objects.count(), 1)
 
     def test_resolve_creates_session_with_metadata(self) -> None:
@@ -246,20 +248,102 @@ class ResolveSubjectTests(TestCase):
         )
         self.assertEqual(response.status_code, 401)
 
-    def test_resolve_multiple_sessions_allowed(self) -> None:
-        """Same subject can have multiple sessions (repeat visits)."""
-        for _ in range(3):
-            response = self.client.post(
-                self.url,
-                {
-                    "subject_identifier": "105-10-0001-2",
-                    "initials": "JD",
-                    "sex": "M",
-                },
-                format="json",
+    def test_resolve_reactivates_incomplete_session(self) -> None:
+        """Second resolve reactivates an incomplete session (200)."""
+        r1 = self.client.post(
+            self.url,
+            {
+                "subject_identifier": "105-10-0001-2",
+                "initials": "JD",
+                "sex": "M",
+            },
+            format="json",
+        )
+        self.assertEqual(r1.status_code, 201)
+        session_id = r1.data["session_id"]
+
+        # Second resolve — same session returned
+        r2 = self.client.post(
+            self.url,
+            {
+                "subject_identifier": "105-10-0001-2",
+                "initials": "JD",
+                "sex": "M",
+            },
+            format="json",
+        )
+        self.assertEqual(r2.status_code, 200)
+        self.assertTrue(r2.data["reactivated"])
+        self.assertEqual(r2.data["session_id"], session_id)
+        self.assertEqual(RetinopathySession.objects.count(), 1)
+
+    def test_resolve_creates_new_after_complete(self) -> None:
+        """New session created when previous session is complete."""
+        r1 = self.client.post(
+            self.url,
+            {
+                "subject_identifier": "105-10-0001-2",
+                "initials": "JD",
+                "sex": "M",
+            },
+            format="json",
+        )
+        session = RetinopathySession.objects.get(pk=r1.data["session_id"])
+
+        # Complete the session
+        for ft in ("left", "right", "report"):
+            RetinalImage.objects.create(
+                session=session,
+                file_type=ft,
+                original_filename=f"{ft}.jpg",
+                stored_filename=f"{ft}_stored.jpg",
+                capture_datetime=timezone.now(),
             )
-            self.assertEqual(response.status_code, 201)
-        self.assertEqual(RetinopathySession.objects.count(), 3)
+
+        # Next resolve creates a new session
+        r2 = self.client.post(
+            self.url,
+            {
+                "subject_identifier": "105-10-0001-2",
+                "initials": "JD",
+                "sex": "M",
+            },
+            format="json",
+        )
+        self.assertEqual(r2.status_code, 201)
+        self.assertFalse(r2.data["reactivated"])
+        self.assertNotEqual(r2.data["session_id"], r1.data["session_id"])
+        self.assertEqual(RetinopathySession.objects.count(), 2)
+
+    def test_resolve_no_reactivation_after_24_hours(self) -> None:
+        """Sessions older than 24 hours are not reactivated."""
+        r1 = self.client.post(
+            self.url,
+            {
+                "subject_identifier": "105-10-0001-2",
+                "initials": "JD",
+                "sex": "M",
+            },
+            format="json",
+        )
+        # Age the session beyond 24 hours
+        old_time = timezone.now() - timedelta(hours=25)
+        RetinopathySession.objects.filter(
+            pk=r1.data["session_id"]
+        ).update(created_datetime=old_time)
+
+        r2 = self.client.post(
+            self.url,
+            {
+                "subject_identifier": "105-10-0001-2",
+                "initials": "JD",
+                "sex": "M",
+            },
+            format="json",
+        )
+        self.assertEqual(r2.status_code, 201)
+        self.assertFalse(r2.data["reactivated"])
+        self.assertNotEqual(r2.data["session_id"], r1.data["session_id"])
 
     def test_resolve_subject_without_dob(self) -> None:
         """Subject with null dob skips age validation."""
