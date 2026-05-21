@@ -30,6 +30,7 @@ _PDF_MAGIC = b"%PDF"
 # Default settings
 _DEFAULT_MAX_FILE_SIZE_MB = 10
 _DEFAULT_SESSION_EXPIRE_MINUTES = 120
+_DEFAULT_SESSION_REACTIVATION_HOURS = 24
 
 
 def _get_max_file_size_bytes() -> int:
@@ -43,6 +44,16 @@ def _get_session_expire_minutes() -> int:
             settings,
             "EDC_RETINOPATHY_SESSION_EXPIRE_MINUTES",
             _DEFAULT_SESSION_EXPIRE_MINUTES,
+        )
+    )
+
+
+def _get_session_reactivation_hours() -> int:
+    return int(
+        getattr(
+            settings,
+            "EDC_RETINOPATHY_SESSION_REACTIVATION_HOURS",
+            _DEFAULT_SESSION_REACTIVATION_HOURS,
         )
     )
 
@@ -240,8 +251,10 @@ class ResolveSubjectView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # --- Try to reactivate an incomplete session (within 24 hours) ---
-        reactivation_cutoff = timezone.now() - timedelta(hours=24)
+        # --- Try to reactivate an incomplete session ---
+        reactivation_cutoff = timezone.now() - timedelta(
+            hours=_get_session_reactivation_hours()
+        )
         existing_session = (
             RetinopathySession.objects.filter(
                 subject_identifier=subject_identifier,
