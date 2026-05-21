@@ -1,10 +1,14 @@
 from __future__ import annotations
 
+import logging
+import os
+import tempfile
 import uuid
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 
 from django.conf import settings
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
@@ -14,7 +18,32 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from ..models import RetinalImage, RetinopathySession
-from .serializers import ResolveSubjectSerializer, FileUploadSerializer
+from .serializers import FileUploadSerializer, ResolveSubjectSerializer
+
+logger = logging.getLogger(__name__)
+
+# Magic bytes for basic content validation
+_JPEG_MAGIC = b"\xff\xd8\xff"
+_PDF_MAGIC = b"%PDF"
+
+# Default settings
+_DEFAULT_MAX_FILE_SIZE_MB = 10
+_DEFAULT_SESSION_EXPIRE_MINUTES = 30
+
+
+def _get_max_file_size_bytes() -> int:
+    mb = getattr(settings, "EDC_RETINOPATHY_MAX_FILE_SIZE_MB", _DEFAULT_MAX_FILE_SIZE_MB)
+    return int(mb * 1024 * 1024)
+
+
+def _get_session_expire_minutes() -> int:
+    return int(
+        getattr(
+            settings,
+            "EDC_RETINOPATHY_SESSION_EXPIRE_MINUTES",
+            _DEFAULT_SESSION_EXPIRE_MINUTES,
+        )
+    )
 
 
 def _get_storage_dir() -> Path:
@@ -32,26 +61,31 @@ def _validate_subject(
     subject_identifier: str,
     initials: str,
     sex: str,
-    age: int,
+    age: int | None,
 ) -> dict:
     """Validate subject against RegisteredSubject.
 
-    Returns a dict with 'valid' (bool) and 'errors' (list of str).
+    Returns a dict with 'valid' (bool), 'code' (str), and
+    'errors' (list of str).
     """
     RegisteredSubject = _get_registered_subject_model()
-    errors = []
+    errors: list[str] = []
     try:
         rs = RegisteredSubject.objects.get(
             subject_identifier=subject_identifier,
         )
     except RegisteredSubject.DoesNotExist:
-        return {"valid": False, "errors": ["Subject identifier not found."]}
+        return {
+            "valid": False,
+            "code": "subject_not_found",
+            "errors": ["Subject identifier not found."],
+        }
 
-    if initials and rs.initials and rs.initials.upper() != initials.upper():
+    if rs.initials and rs.initials.upper() != initials.upper():
         errors.append(
             f"Initials mismatch: expected '{rs.initials}', got '{initials}'."
         )
-    if sex and rs.gender and rs.gender.upper() != sex.upper():
+    if rs.gender and rs.gender.upper() != sex.upper():
         errors.append(
             f"Sex mismatch: expected '{rs.gender}', got '{sex}'."
         )
@@ -67,8 +101,53 @@ def _validate_subject(
                 f"Age mismatch: expected ~{expected_age}, got {age}."
             )
     if errors:
-        return {"valid": False, "errors": errors}
-    return {"valid": True, "errors": []}
+        return {"valid": False, "code": "validation_mismatch", "errors": errors}
+    return {"valid": True, "code": "ok", "errors": []}
+
+
+def _validate_file_content(
+    uploaded_file, file_type: str
+) -> str | None:
+    """Basic magic-byte validation. Returns error message or None."""
+    head = uploaded_file.read(8)
+    uploaded_file.seek(0)
+    if not head:
+        return "Uploaded file is empty."
+    if file_type == "report":
+        if not head.startswith(_PDF_MAGIC):
+            return "Report file does not appear to be a valid PDF."
+    else:
+        # Accept JPEG and PNG for eye images
+        if not (head.startswith(_JPEG_MAGIC) or head.startswith(b"\x89PNG")):
+            return (
+                "Image file does not appear to be a valid JPEG or PNG."
+            )
+    return None
+
+
+def _image_response_data(retinal_image: RetinalImage) -> dict:
+    """Build the standard response payload for a RetinalImage."""
+    return {
+        "id": str(retinal_image.pk),
+        "session_id": retinal_image.session_id,
+        "file_type": retinal_image.file_type,
+        "original_filename": retinal_image.original_filename,
+        "stored_filename": retinal_image.stored_filename,
+    }
+
+
+class PingView(APIView):
+    """Health-check endpoint for the camera to verify connectivity.
+
+    GET /api/retinopathy/ping/
+    Returns 200 with {"status": "ok"} if the server and auth are working.
+    """
+
+    authentication_classes = [TokenAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request: Request) -> Response:
+        return Response({"status": "ok"}, status=status.HTTP_200_OK)
 
 
 class ResolveSubjectView(APIView):
@@ -88,25 +167,41 @@ class ResolveSubjectView(APIView):
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
 
+        subject_identifier = data["subject_identifier"]
+        device_id = data.get("device_id", "")
+
         result = _validate_subject(
-            subject_identifier=data["subject_identifier"],
-            initials=data.get("initials", ""),
-            sex=data.get("sex", ""),
+            subject_identifier=subject_identifier,
+            initials=data["initials"],
+            sex=data["sex"],
             age=data.get("age"),
         )
         if not result["valid"]:
+            logger.warning(
+                "Resolve failed for %s (device=%s): %s",
+                subject_identifier,
+                device_id,
+                "; ".join(result["errors"]),
+            )
             return Response(
-                {"errors": result["errors"]},
+                {"code": result["code"], "errors": result["errors"]},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
         session = RetinopathySession.objects.create(
-            subject_identifier=data["subject_identifier"],
-            initials=data.get("initials", ""),
-            sex=data.get("sex", ""),
+            subject_identifier=subject_identifier,
+            initials=data["initials"],
+            sex=data["sex"],
             age=data.get("age"),
-            device_id=data.get("device_id", ""),
+            device_id=device_id,
             site_id=data.get("site_id", ""),
+        )
+
+        logger.info(
+            "Session %s created for %s (device=%s)",
+            session.pk,
+            subject_identifier,
+            device_id,
         )
 
         return Response(
@@ -118,13 +213,63 @@ class ResolveSubjectView(APIView):
         )
 
 
+class SessionStatusView(APIView):
+    """Return the current session status for a subject.
+
+    GET /api/retinopathy/<subject_identifier>/status/
+    Returns the most recent session and which file types have been received.
+    """
+
+    authentication_classes = [TokenAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get(
+        self,
+        request: Request,
+        subject_identifier: str,
+    ) -> Response:
+        session = (
+            RetinopathySession.objects.filter(
+                subject_identifier=subject_identifier,
+            )
+            .order_by("-created_datetime")
+            .first()
+        )
+        if not session:
+            return Response(
+                {
+                    "code": "no_session",
+                    "error": "No session found for this subject.",
+                },
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        uploaded = list(
+            session.files.values_list("file_type", flat=True)
+        )
+        complete = set(uploaded) == {"left", "right", "report"}
+
+        return Response(
+            {
+                "session_id": session.pk,
+                "subject_identifier": session.subject_identifier,
+                "created_datetime": session.created_datetime.isoformat(),
+                "uploaded": sorted(uploaded),
+                "missing": sorted({"left", "right", "report"} - set(uploaded)),
+                "complete": complete,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
 class FileUploadView(APIView):
     """Receive a file (left eye, right eye, or report) from the camera.
 
     POST /api/retinopathy/<subject_identifier>/left/
     POST /api/retinopathy/<subject_identifier>/right/
     POST /api/retinopathy/<subject_identifier>/report/
-    Body: multipart/form-data with 'file' field.
+    Body: multipart/form-data with 'file' field and optional
+    'capture_datetime'.
     """
 
     authentication_classes = [TokenAuthentication]
@@ -139,44 +284,95 @@ class FileUploadView(APIView):
     ) -> Response:
         if file_type not in ("left", "right", "report"):
             return Response(
-                {"error": f"Invalid file type: '{file_type}'."},
+                {
+                    "code": "invalid_file_type",
+                    "error": f"Invalid file type: '{file_type}'.",
+                },
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
         serializer = FileUploadSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        # Find the most recent session for this subject
+        uploaded_file = serializer.validated_data["file"]
+        capture_datetime = serializer.validated_data["capture_datetime"]
+
+        # --- File size check ---
+        max_size = _get_max_file_size_bytes()
+        if uploaded_file.size > max_size:
+            max_mb = max_size / (1024 * 1024)
+            logger.warning(
+                "File too large for %s/%s: %s bytes (max %s MB)",
+                subject_identifier,
+                file_type,
+                uploaded_file.size,
+                max_mb,
+            )
+            return Response(
+                {
+                    "code": "file_too_large",
+                    "error": (
+                        f"File size {uploaded_file.size} bytes exceeds "
+                        f"maximum of {max_mb:.0f} MB."
+                    ),
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # --- Content validation ---
+        content_error = _validate_file_content(uploaded_file, file_type)
+        if content_error:
+            logger.warning(
+                "Content validation failed for %s/%s: %s",
+                subject_identifier,
+                file_type,
+                content_error,
+            )
+            return Response(
+                {"code": "invalid_content", "error": content_error},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # --- Find most recent non-expired session ---
+        expire_minutes = _get_session_expire_minutes()
+        cutoff = timezone.now() - timedelta(minutes=expire_minutes)
         session = (
             RetinopathySession.objects.filter(
                 subject_identifier=subject_identifier,
+                created_datetime__gte=cutoff,
             )
             .order_by("-created_datetime")
             .first()
         )
         if not session:
             return Response(
-                {"error": "No session found. Call resolve first."},
+                {
+                    "code": "no_session",
+                    "error": (
+                        "No active session found. Call resolve first. "
+                        f"Sessions expire after {expire_minutes} minutes."
+                    ),
+                },
                 status=status.HTTP_404_NOT_FOUND,
             )
 
-        # Check for duplicate file_type on this session
-        if RetinalImage.objects.filter(
+        # --- Idempotent duplicate check ---
+        existing = RetinalImage.objects.filter(
             session=session, file_type=file_type
-        ).exists():
+        ).first()
+        if existing:
+            logger.info(
+                "Duplicate upload for %s/%s session=%s — returning existing",
+                subject_identifier,
+                file_type,
+                session.pk,
+            )
             return Response(
-                {
-                    "error": (
-                        f"A '{file_type}' file has already been uploaded "
-                        f"for session {session.pk}."
-                    ),
-                },
-                status=status.HTTP_409_CONFLICT,
+                _image_response_data(existing),
+                status=status.HTTP_200_OK,
             )
 
-        uploaded_file = serializer.validated_data["file"]
-
-        # Save file to storage
+        # --- Save file atomically ---
         ext = Path(uploaded_file.name).suffix.lower() or (
             ".pdf" if file_type == "report" else ".jpg"
         )
@@ -184,9 +380,22 @@ class FileUploadView(APIView):
         dest = _get_storage_dir() / stored_filename
 
         dest.parent.mkdir(parents=True, exist_ok=True)
-        with dest.open("wb") as out:
-            for chunk in uploaded_file.chunks():
-                out.write(chunk)
+
+        fd, tmp_path = tempfile.mkstemp(
+            dir=str(dest.parent), suffix=f".tmp{ext}"
+        )
+        try:
+            with os.fdopen(fd, "wb") as out:
+                for chunk in uploaded_file.chunks():
+                    out.write(chunk)
+            os.rename(tmp_path, str(dest))
+        except BaseException:
+            # Clean up temp file on any failure
+            try:
+                os.unlink(tmp_path)
+            except OSError:
+                pass
+            raise
 
         retinal_image = RetinalImage.objects.create(
             session=session,
@@ -195,15 +404,19 @@ class FileUploadView(APIView):
             stored_filename=stored_filename,
             content_type=uploaded_file.content_type or "",
             file_size=uploaded_file.size,
+            capture_datetime=capture_datetime,
+        )
+
+        logger.info(
+            "Received %s for %s session=%s (%s bytes, stored=%s)",
+            file_type,
+            subject_identifier,
+            session.pk,
+            uploaded_file.size,
+            stored_filename,
         )
 
         return Response(
-            {
-                "id": str(retinal_image.pk),
-                "session_id": session.pk,
-                "file_type": file_type,
-                "original_filename": uploaded_file.name,
-                "stored_filename": stored_filename,
-            },
+            _image_response_data(retinal_image),
             status=status.HTTP_201_CREATED,
         )

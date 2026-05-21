@@ -10,12 +10,18 @@ Overview
 
 The camera follows a four-step protocol for each patient encounter:
 
-1. **Resolve** the subject identifier (validates against the EDC registry).
-2. **Upload left eye** image.
-3. **Upload right eye** image.
-4. **Upload report** PDF.
+1. **Ping** the server to verify connectivity and authentication.
+2. **Resolve** the subject identifier (validates against the EDC registry).
+3. **Upload left eye** image.
+4. **Upload right eye** image.
+5. **Upload report** PDF.
+
+At any point the camera can **check session status** to see which files
+have been received and whether the session is complete.
 
 All endpoints require token authentication and return JSON responses.
+Every error response includes a machine-readable ``code`` field for
+programmatic handling.
 
 Authentication
 ==============
@@ -47,6 +53,30 @@ depends on the server configuration, for example::
 
 Endpoints
 =========
+
+Health Check (Ping)
+-------------------
+
+Verify that the server is reachable and authentication is working.
+Call this before starting a patient workflow.
+
+.. list-table::
+   :widths: 20 80
+
+   * - **URL**
+     - ``GET /api/retinopathy/ping/``
+   * - **Auth**
+     - Token (required)
+
+Success response (200)
+^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: json
+
+   {
+     "status": "ok"
+   }
+
 
 Step 1: Resolve Subject
 -----------------------
@@ -81,12 +111,12 @@ Request body
      - The subject's unique identifier in the EDC.
    * - ``initials``
      - string
-     - No
+     - Yes
      - Subject initials (validated case-insensitively against the registry).
    * - ``sex``
      - string
-     - No
-     - Subject sex, e.g. ``"M"`` or ``"F"`` (validated case-insensitively).
+     - Yes
+     - ``"M"`` or ``"F"`` (case-insensitive; normalised to uppercase).
    * - ``age``
      - integer
      - No
@@ -112,7 +142,7 @@ Success response (201)
 
 The ``session_id`` is used internally to link uploads. The camera does not
 need to track it; subsequent uploads are matched by ``subject_identifier``
-to the most recent session.
+to the most recent active session.
 
 Error response (400)
 ^^^^^^^^^^^^^^^^^^^^
@@ -120,6 +150,7 @@ Error response (400)
 .. code-block:: json
 
    {
+     "code": "subject_not_found",
      "errors": [
        "Subject identifier not found."
      ]
@@ -130,6 +161,7 @@ Multiple validation errors are returned together:
 .. code-block:: json
 
    {
+     "code": "validation_mismatch",
      "errors": [
        "Initials mismatch: expected 'JD', got 'XX'.",
        "Sex mismatch: expected 'M', got 'F'.",
@@ -141,14 +173,53 @@ Validation rules
 ^^^^^^^^^^^^^^^^
 
 - ``subject_identifier`` must exist in ``RegisteredSubject``.
-- ``initials`` comparison is case-insensitive. Skipped if the camera sends
-  an empty string or the registry value is blank.
-- ``sex`` is compared against ``RegisteredSubject.gender``
-  (case-insensitive). Skipped if empty on either side.
+- ``initials`` comparison is case-insensitive. Skipped if the registry
+  value is blank.
+- ``sex`` must be ``"M"`` or ``"F"`` (case-insensitive). Compared against
+  ``RegisteredSubject.gender``. Skipped if the registry value is blank.
 - ``age`` is compared against the age calculated from
   ``RegisteredSubject.dob``. A tolerance of 1 year is allowed to handle
   birthday boundaries. Skipped if ``age`` is ``null`` or ``dob`` is not
   recorded.
+
+
+Session Status
+--------------
+
+Check which files have been uploaded for the current session. Useful for
+resuming after a crash or network interruption.
+
+.. list-table::
+   :widths: 20 80
+
+   * - **URL**
+     - ``GET /api/retinopathy/<subject_identifier>/status/``
+   * - **Auth**
+     - Token (required)
+
+Success response (200)
+^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: json
+
+   {
+     "session_id": 42,
+     "subject_identifier": "105-10-0001-2",
+     "created_datetime": "2026-05-21T10:15:30.123456+00:00",
+     "uploaded": ["left", "right"],
+     "missing": ["report"],
+     "complete": false
+   }
+
+Error response (404)
+^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: json
+
+   {
+     "code": "no_session",
+     "error": "No session found for this subject."
+   }
 
 
 Step 2: Upload Left Eye Image
@@ -178,7 +249,11 @@ Request body
    * - ``file``
      - file
      - Yes
-     - The retinal image file (JPEG, PNG, etc.).
+     - The retinal image file (JPEG or PNG).
+   * - ``capture_datetime``
+     - ISO 8601
+     - Yes
+     - Timestamp when the image was captured by the camera.
 
 Success response (201)
 ^^^^^^^^^^^^^^^^^^^^^^
@@ -192,6 +267,14 @@ Success response (201)
      "original_filename": "left_eye.jpg",
      "stored_filename": "8f3a9b2c1d4e5f6a7b8c9d0e1f2a3b4c.jpg"
    }
+
+Retry behaviour
+^^^^^^^^^^^^^^^
+
+If the same file type has already been uploaded for the current session,
+the server returns ``200 OK`` with the existing record. This makes
+uploads **idempotent** — the camera can safely retry after a network
+timeout without creating duplicates.
 
 
 Step 3: Upload Right Eye Image
@@ -225,13 +308,47 @@ Step 4: Upload Report
      - Token (required)
 
 Request and response format is identical to Step 2, with
-``"file_type": "report"``. The file is expected to be a PDF.
+``"file_type": "report"``. The file must be a PDF.
+
+
+Error Codes
+===========
+
+Every error response includes a ``code`` field for programmatic handling.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 15 60
+
+   * - Code
+     - HTTP Status
+     - Meaning
+   * - ``subject_not_found``
+     - 400
+     - Subject identifier does not exist in the registry.
+   * - ``validation_mismatch``
+     - 400
+     - One or more demographics (initials, sex, age) do not match.
+   * - ``invalid_file_type``
+     - 400
+     - URL contains an unrecognised file type (not left/right/report).
+   * - ``invalid_content``
+     - 400
+     - File content does not match expected format (JPEG/PNG for images,
+       PDF for reports).
+   * - ``file_too_large``
+     - 400
+     - File exceeds the configured maximum size.
+   * - ``no_session``
+     - 404
+     - No active session found. Either resolve was not called, or the
+       session has expired.
 
 
 Error Responses
 ===============
 
-All endpoints share these common error responses:
+All endpoints share these common HTTP error statuses:
 
 .. list-table::
    :header-rows: 1
@@ -242,19 +359,15 @@ All endpoints share these common error responses:
      - When
    * - ``400``
      - Bad Request
-     - Missing required fields, validation mismatch, or invalid file type
-       in URL.
+     - Missing required fields, validation mismatch, invalid file type,
+       invalid content, or file too large.
    * - ``401``
      - Unauthorized
      - Missing or invalid authentication token.
    * - ``404``
      - Not Found
-     - Upload attempted for a subject with no prior ``resolve`` call
-       (no session exists).
-   * - ``409``
-     - Conflict
-     - A file of the same type (left, right, or report) has already been
-       uploaded for the current session.
+     - Upload attempted with no active session (not resolved, or session
+       expired).
 
 
 File Storage
@@ -271,6 +384,9 @@ Uploaded files are stored in the directory configured by
 Files are saved under the ``images/`` subdirectory with UUID-based
 filenames to avoid collisions and prevent exposure of patient information
 in filenames. The original filename is preserved in the database.
+
+Files are written atomically (via a temporary file and rename) to prevent
+corrupt partial files if the server crashes during upload.
 
 Directory structure::
 
@@ -358,6 +474,9 @@ One record per uploaded file, linked to a session.
    * - ``file_size``
      - PositiveIntegerField
      - File size in bytes.
+   * - ``capture_datetime``
+     - DateTimeField
+     - Capture timestamp as reported by the camera (required).
    * - ``received_datetime``
      - DateTimeField
      - Timestamp of upload (auto).
@@ -402,17 +521,64 @@ Required settings:
    # RegisteredSubject model (default shown)
    EDC_REGISTRATION_REGISTERED_SUBJECT_MODEL = "edc_registration.registeredsubject"
 
+Optional settings:
+
+.. code-block:: python
+
+   # Maximum upload file size in MB (default: 10)
+   EDC_RETINOPATHY_MAX_FILE_SIZE_MB = 10
+
+   # Session expiry in minutes (default: 30).
+   # Uploads to sessions older than this are rejected.
+   EDC_RETINOPATHY_SESSION_EXPIRE_MINUTES = 30
+
+Logging
+=======
+
+The API logs all requests to the ``edc_retinopathy.api.views`` logger:
+
+- **INFO**: Successful resolves and file uploads (subject, session, device,
+  file type, size).
+- **WARNING**: Failed resolves (validation mismatches, unknown subjects),
+  rejected uploads (oversized files, invalid content).
+
+Configure in Django ``LOGGING``:
+
+.. code-block:: python
+
+   LOGGING = {
+       "version": 1,
+       "handlers": {
+           "file": {
+               "class": "logging.FileHandler",
+               "filename": "/var/log/edc/retinopathy.log",
+           },
+       },
+       "loggers": {
+           "edc_retinopathy.api.views": {
+               "handlers": ["file"],
+               "level": "INFO",
+           },
+       },
+   }
+
 
 Example: Full Workflow
 ======================
 
-Using ``curl`` to demonstrate the four-step protocol:
+Using ``curl`` to demonstrate the complete protocol:
 
 .. code-block:: bash
 
+   TOKEN="9944b09199c62bcf9418ad846dd0e4bbdfc6ee4b"
+   BASE="https://edc.example.com/api/retinopathy"
+
+   # Step 0: Verify connectivity
+   curl -H "Authorization: Token $TOKEN" $BASE/ping/
+
    # Step 1: Resolve subject
-   curl -X POST https://edc.example.com/api/retinopathy/resolve/ \
-     -H "Authorization: Token 9944b09199c62bcf9418ad846dd0e4bbdfc6ee4b" \
+   curl -X POST $BASE/resolve/ \
+     -H "Authorization: Token $TOKEN" \
      -H "Content-Type: application/json" \
      -d '{
        "subject_identifier": "105-10-0001-2",
@@ -424,16 +590,47 @@ Using ``curl`` to demonstrate the four-step protocol:
      }'
 
    # Step 2: Upload left eye image
-   curl -X POST https://edc.example.com/api/retinopathy/105-10-0001-2/left/ \
-     -H "Authorization: Token 9944b09199c62bcf9418ad846dd0e4bbdfc6ee4b" \
-     -F "file=@/path/to/left_eye.jpg"
+   curl -X POST $BASE/105-10-0001-2/left/ \
+     -H "Authorization: Token $TOKEN" \
+     -F "file=@/path/to/left_eye.jpg" \
+     -F "capture_datetime=2026-05-21T10:30:00Z"
 
    # Step 3: Upload right eye image
-   curl -X POST https://edc.example.com/api/retinopathy/105-10-0001-2/right/ \
-     -H "Authorization: Token 9944b09199c62bcf9418ad846dd0e4bbdfc6ee4b" \
-     -F "file=@/path/to/right_eye.jpg"
+   curl -X POST $BASE/105-10-0001-2/right/ \
+     -H "Authorization: Token $TOKEN" \
+     -F "file=@/path/to/right_eye.jpg" \
+     -F "capture_datetime=2026-05-21T10:31:00Z"
 
    # Step 4: Upload report PDF
-   curl -X POST https://edc.example.com/api/retinopathy/105-10-0001-2/report/ \
-     -H "Authorization: Token 9944b09199c62bcf9418ad846dd0e4bbdfc6ee4b" \
+   curl -X POST $BASE/105-10-0001-2/report/ \
+     -H "Authorization: Token $TOKEN" \
      -F "file=@/path/to/report.pdf"
+
+   # Check session status at any point
+   curl -H "Authorization: Token $TOKEN" \
+     $BASE/105-10-0001-2/status/
+
+
+Example: Recovery After Network Failure
+=======================================
+
+If the camera loses connectivity after uploading the left eye, it can
+recover by checking the session status:
+
+.. code-block:: bash
+
+   # Camera reconnects and checks what was received
+   curl -H "Authorization: Token $TOKEN" \
+     $BASE/105-10-0001-2/status/
+   # Response: {"uploaded": ["left"], "missing": ["report", "right"], ...}
+
+   # Camera skips left (already done) and continues with right
+   curl -X POST $BASE/105-10-0001-2/right/ \
+     -H "Authorization: Token $TOKEN" \
+     -F "file=@/path/to/right_eye.jpg"
+
+   # Or if the camera retries left anyway, it gets 200 (not an error)
+   curl -X POST $BASE/105-10-0001-2/left/ \
+     -H "Authorization: Token $TOKEN" \
+     -F "file=@/path/to/left_eye.jpg"
+   # Returns 200 with the existing record — safe to retry

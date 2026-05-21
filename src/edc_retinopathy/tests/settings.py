@@ -37,6 +37,9 @@ EDC_REGISTRATION_REGISTERED_SUBJECT_MODEL = (
     "edc_retinopathy_tests.registeredsubject"
 )
 
+EDC_RETINOPATHY_MAX_FILE_SIZE_MB = 10
+EDC_RETINOPATHY_SESSION_EXPIRE_MINUTES = 30
+
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
         "rest_framework.authentication.TokenAuthentication",

@@ -73,7 +73,11 @@ class ResolveSubjectTests(TestCase):
         """Unknown subject_identifier returns 400."""
         response = self.client.post(
             self.url,
-            {"subject_identifier": "999-99-9999-9"},
+            {
+                "subject_identifier": "999-99-9999-9",
+                "initials": "JD",
+                "sex": "M",
+            },
             format="json",
         )
         self.assertEqual(response.status_code, 400)
@@ -191,13 +195,37 @@ class ResolveSubjectTests(TestCase):
         self.assertEqual(response.status_code, 201)
 
     def test_resolve_optional_fields(self) -> None:
-        """Only subject_identifier is required; others are optional."""
+        """subject_identifier, initials, and sex are required; age,
+        device_id, site_id are optional.
+        """
         response = self.client.post(
             self.url,
-            {"subject_identifier": "105-10-0001-2"},
+            {
+                "subject_identifier": "105-10-0001-2",
+                "initials": "JD",
+                "sex": "M",
+            },
             format="json",
         )
         self.assertEqual(response.status_code, 201)
+
+    def test_resolve_missing_initials(self) -> None:
+        """Missing initials returns 400 validation error."""
+        response = self.client.post(
+            self.url,
+            {"subject_identifier": "105-10-0001-2", "sex": "M"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 400)
+
+    def test_resolve_missing_sex(self) -> None:
+        """Missing sex returns 400 validation error."""
+        response = self.client.post(
+            self.url,
+            {"subject_identifier": "105-10-0001-2", "initials": "JD"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 400)
 
     def test_resolve_missing_subject_identifier(self) -> None:
         """Missing subject_identifier returns 400 validation error."""
@@ -209,7 +237,11 @@ class ResolveSubjectTests(TestCase):
         client = APIClient()
         response = client.post(
             self.url,
-            {"subject_identifier": "105-10-0001-2"},
+            {
+                "subject_identifier": "105-10-0001-2",
+                "initials": "JD",
+                "sex": "M",
+            },
             format="json",
         )
         self.assertEqual(response.status_code, 401)
@@ -219,7 +251,11 @@ class ResolveSubjectTests(TestCase):
         for _ in range(3):
             response = self.client.post(
                 self.url,
-                {"subject_identifier": "105-10-0001-2"},
+                {
+                    "subject_identifier": "105-10-0001-2",
+                    "initials": "JD",
+                    "sex": "M",
+                },
                 format="json",
             )
             self.assertEqual(response.status_code, 201)
@@ -262,3 +298,44 @@ class ResolveSubjectTests(TestCase):
             format="json",
         )
         self.assertEqual(response.status_code, 201)
+
+    def test_resolve_error_code_subject_not_found(self) -> None:
+        """Error response includes machine-readable code."""
+        response = self.client.post(
+            self.url,
+            {
+                "subject_identifier": "999-99-9999-9",
+                "initials": "JD",
+                "sex": "M",
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.data["code"], "subject_not_found")
+
+    def test_resolve_error_code_validation_mismatch(self) -> None:
+        """Validation mismatch includes the correct code."""
+        response = self.client.post(
+            self.url,
+            {
+                "subject_identifier": "105-10-0001-2",
+                "initials": "XX",
+                "sex": "M",
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.data["code"], "validation_mismatch")
+
+    def test_resolve_invalid_sex_value(self) -> None:
+        """Sex must be M or F; other values are rejected."""
+        response = self.client.post(
+            self.url,
+            {
+                "subject_identifier": "105-10-0001-2",
+                "initials": "JD",
+                "sex": "Male",
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, 400)

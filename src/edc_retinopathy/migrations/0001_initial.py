@@ -131,6 +131,12 @@ class Migration(migrations.Migration):
                         default=0, help_text="File size in bytes."
                     ),
                 ),
+                (
+                    "capture_datetime",
+                    models.DateTimeField(
+                        help_text="Capture timestamp as reported by the camera.",
+                    ),
+                ),
                 ("received_datetime", models.DateTimeField(auto_now_add=True)),
                 (
                     "session",

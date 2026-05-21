@@ -60,6 +60,10 @@ class RetinalImage(models.Model):
         help_text="File size in bytes.",
     )
 
+    capture_datetime = models.DateTimeField(
+        help_text="Capture timestamp as reported by the camera.",
+    )
+
     received_datetime = models.DateTimeField(auto_now_add=True)
 
     class Meta:

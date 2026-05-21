@@ -2,18 +2,21 @@
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.test import TestCase
+from django.test import TestCase, override_settings
+from django.utils import timezone
 from rest_framework.authtoken.models import Token
 from rest_framework.test import APIClient
 
 from ..models import RetinalImage, RetinopathySession
 from .models import RegisteredSubject
+
+CAPTURE_DT = "2026-05-21T10:30:00Z"
 
 
 def _make_image_file(
@@ -21,11 +24,23 @@ def _make_image_file(
     content_type: str = "image/jpeg",
     size: int = 1024,
 ) -> SimpleUploadedFile:
-    """Create a minimal fake image file."""
+    """Create a minimal fake JPEG file with valid magic bytes."""
     return SimpleUploadedFile(
         name=name,
         content=b"\xff\xd8\xff\xe0" + b"\x00" * (size - 4),
         content_type=content_type,
+    )
+
+
+def _make_png_file(
+    name: str = "test.png",
+    size: int = 1024,
+) -> SimpleUploadedFile:
+    """Create a minimal fake PNG file with valid magic bytes."""
+    return SimpleUploadedFile(
+        name=name,
+        content=b"\x89PNG\r\n\x1a\n" + b"\x00" * (size - 8),
+        content_type="image/png",
     )
 
 
@@ -38,6 +53,18 @@ def _make_pdf_file(
         name=name,
         content=b"%PDF-1.4" + b"\x00" * (size - 8),
         content_type="application/pdf",
+    )
+
+
+def _make_invalid_file(
+    name: str = "garbage.jpg",
+    size: int = 512,
+) -> SimpleUploadedFile:
+    """Create a file with invalid content (no valid magic bytes)."""
+    return SimpleUploadedFile(
+        name=name,
+        content=b"THIS IS NOT AN IMAGE" + b"\x00" * (size - 20),
+        content_type="image/jpeg",
     )
 
 
@@ -75,7 +102,7 @@ class LeftEyeUploadTests(FileUploadBaseTestCase):
         """Valid left eye image upload returns 201."""
         response = self.client.post(
             self._upload_url("left"),
-            {"file": _make_image_file()},
+            {"file": _make_image_file(), "capture_datetime": CAPTURE_DT},
             format="multipart",
         )
         self.assertEqual(response.status_code, 201)
@@ -87,7 +114,10 @@ class LeftEyeUploadTests(FileUploadBaseTestCase):
         """Upload creates a RetinalImage with correct metadata."""
         self.client.post(
             self._upload_url("left"),
-            {"file": _make_image_file(name="left_eye_scan.jpg")},
+            {
+                "file": _make_image_file(name="left_eye_scan.jpg"),
+                "capture_datetime": CAPTURE_DT,
+            },
             format="multipart",
         )
         img = RetinalImage.objects.get()
@@ -102,7 +132,7 @@ class LeftEyeUploadTests(FileUploadBaseTestCase):
         """File is physically written to the storage directory."""
         self.client.post(
             self._upload_url("left"),
-            {"file": _make_image_file()},
+            {"file": _make_image_file(), "capture_datetime": CAPTURE_DT},
             format="multipart",
         )
         img = RetinalImage.objects.get()
@@ -112,20 +142,24 @@ class LeftEyeUploadTests(FileUploadBaseTestCase):
         self.assertTrue(stored_path.exists())
         self.assertGreater(stored_path.stat().st_size, 0)
 
-    def test_upload_left_eye_duplicate_rejected(self) -> None:
-        """Second left eye upload for same session returns 409."""
+    def test_upload_left_eye_duplicate_idempotent(self) -> None:
+        """Second left eye upload for same session returns 200 with existing record."""
         self.client.post(
             self._upload_url("left"),
-            {"file": _make_image_file()},
+            {"file": _make_image_file(), "capture_datetime": CAPTURE_DT},
             format="multipart",
         )
         response = self.client.post(
             self._upload_url("left"),
-            {"file": _make_image_file(name="another.jpg")},
+            {
+                "file": _make_image_file(name="another.jpg"),
+                "capture_datetime": CAPTURE_DT,
+            },
             format="multipart",
         )
-        self.assertEqual(response.status_code, 409)
+        self.assertEqual(response.status_code, 200)
         self.assertEqual(RetinalImage.objects.count(), 1)
+        self.assertEqual(response.data["file_type"], "left")
 
 
 class RightEyeUploadTests(FileUploadBaseTestCase):
@@ -135,25 +169,25 @@ class RightEyeUploadTests(FileUploadBaseTestCase):
         """Valid right eye image upload returns 201."""
         response = self.client.post(
             self._upload_url("right"),
-            {"file": _make_image_file()},
+            {"file": _make_image_file(), "capture_datetime": CAPTURE_DT},
             format="multipart",
         )
         self.assertEqual(response.status_code, 201)
         self.assertEqual(response.data["file_type"], "right")
 
-    def test_upload_right_eye_duplicate_rejected(self) -> None:
-        """Second right eye upload for same session returns 409."""
+    def test_upload_right_eye_duplicate_idempotent(self) -> None:
+        """Second right eye upload for same session returns 200."""
         self.client.post(
             self._upload_url("right"),
-            {"file": _make_image_file()},
+            {"file": _make_image_file(), "capture_datetime": CAPTURE_DT},
             format="multipart",
         )
         response = self.client.post(
             self._upload_url("right"),
-            {"file": _make_image_file()},
+            {"file": _make_image_file(), "capture_datetime": CAPTURE_DT},
             format="multipart",
         )
-        self.assertEqual(response.status_code, 409)
+        self.assertEqual(response.status_code, 200)
 
 
 class ReportUploadTests(FileUploadBaseTestCase):
@@ -163,7 +197,7 @@ class ReportUploadTests(FileUploadBaseTestCase):
         """Valid report PDF upload returns 201."""
         response = self.client.post(
             self._upload_url("report"),
-            {"file": _make_pdf_file()},
+            {"file": _make_pdf_file(), "capture_datetime": CAPTURE_DT},
             format="multipart",
         )
         self.assertEqual(response.status_code, 201)
@@ -173,7 +207,7 @@ class ReportUploadTests(FileUploadBaseTestCase):
         """Report PDF is physically written to storage."""
         self.client.post(
             self._upload_url("report"),
-            {"file": _make_pdf_file()},
+            {"file": _make_pdf_file(), "capture_datetime": CAPTURE_DT},
             format="multipart",
         )
         img = RetinalImage.objects.get()
@@ -184,19 +218,160 @@ class ReportUploadTests(FileUploadBaseTestCase):
         self.assertTrue(img.stored_filename.endswith(".pdf"))
         self.assertEqual(img.content_type, "application/pdf")
 
-    def test_upload_report_duplicate_rejected(self) -> None:
-        """Second report upload for same session returns 409."""
+    def test_upload_report_duplicate_idempotent(self) -> None:
+        """Second report upload for same session returns 200."""
         self.client.post(
             self._upload_url("report"),
-            {"file": _make_pdf_file()},
+            {"file": _make_pdf_file(), "capture_datetime": CAPTURE_DT},
             format="multipart",
         )
         response = self.client.post(
             self._upload_url("report"),
-            {"file": _make_pdf_file()},
+            {"file": _make_pdf_file(), "capture_datetime": CAPTURE_DT},
             format="multipart",
         )
-        self.assertEqual(response.status_code, 409)
+        self.assertEqual(response.status_code, 200)
+
+
+class ContentValidationTests(FileUploadBaseTestCase):
+    """Tests for magic-byte content validation."""
+
+    def test_invalid_content_for_image_rejected(self) -> None:
+        """Non-JPEG/PNG file sent as image returns 400."""
+        response = self.client.post(
+            self._upload_url("left"),
+            {"file": _make_invalid_file(), "capture_datetime": CAPTURE_DT},
+            format="multipart",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.data["code"], "invalid_content")
+
+    def test_invalid_content_for_report_rejected(self) -> None:
+        """Non-PDF file sent as report returns 400."""
+        bad_pdf = SimpleUploadedFile(
+            name="report.pdf",
+            content=b"NOT A PDF FILE" + b"\x00" * 100,
+            content_type="application/pdf",
+        )
+        response = self.client.post(
+            self._upload_url("report"),
+            {"file": bad_pdf, "capture_datetime": CAPTURE_DT},
+            format="multipart",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.data["code"], "invalid_content")
+
+    def test_png_accepted_for_image(self) -> None:
+        """PNG files are accepted for eye images."""
+        response = self.client.post(
+            self._upload_url("left"),
+            {"file": _make_png_file(), "capture_datetime": CAPTURE_DT},
+            format="multipart",
+        )
+        self.assertEqual(response.status_code, 201)
+
+    def test_empty_file_rejected(self) -> None:
+        """Empty file returns 400."""
+        empty = SimpleUploadedFile(
+            name="empty.jpg", content=b"", content_type="image/jpeg"
+        )
+        response = self.client.post(
+            self._upload_url("left"),
+            {"file": empty, "capture_datetime": CAPTURE_DT},
+            format="multipart",
+        )
+        self.assertEqual(response.status_code, 400)
+
+
+class FileSizeLimitTests(FileUploadBaseTestCase):
+    """Tests for file size limits."""
+
+    @override_settings(EDC_RETINOPATHY_MAX_FILE_SIZE_MB=0.001)
+    def test_oversized_file_rejected(self) -> None:
+        """File exceeding max size returns 400."""
+        response = self.client.post(
+            self._upload_url("left"),
+            {"file": _make_image_file(size=2048), "capture_datetime": CAPTURE_DT},
+            format="multipart",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.data["code"], "file_too_large")
+
+    @override_settings(EDC_RETINOPATHY_MAX_FILE_SIZE_MB=10)
+    def test_file_within_limit_accepted(self) -> None:
+        """File within max size is accepted."""
+        response = self.client.post(
+            self._upload_url("left"),
+            {"file": _make_image_file(size=1024), "capture_datetime": CAPTURE_DT},
+            format="multipart",
+        )
+        self.assertEqual(response.status_code, 201)
+
+
+class SessionExpiryTests(FileUploadBaseTestCase):
+    """Tests for session staleness guard."""
+
+    def test_expired_session_not_found(self) -> None:
+        """Upload to a session older than expire minutes returns 404."""
+        old_time = timezone.now() - timedelta(minutes=60)
+        RetinopathySession.objects.filter(pk=self.session.pk).update(
+            created_datetime=old_time
+        )
+        response = self.client.post(
+            self._upload_url("left"),
+            {"file": _make_image_file(), "capture_datetime": CAPTURE_DT},
+            format="multipart",
+        )
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.data["code"], "no_session")
+
+    def test_fresh_session_accepted(self) -> None:
+        """Upload to a recent session succeeds."""
+        response = self.client.post(
+            self._upload_url("left"),
+            {"file": _make_image_file(), "capture_datetime": CAPTURE_DT},
+            format="multipart",
+        )
+        self.assertEqual(response.status_code, 201)
+
+    @override_settings(EDC_RETINOPATHY_SESSION_EXPIRE_MINUTES=120)
+    def test_custom_expiry_setting(self) -> None:
+        """Custom expiry window is respected."""
+        old_time = timezone.now() - timedelta(minutes=90)
+        RetinopathySession.objects.filter(pk=self.session.pk).update(
+            created_datetime=old_time
+        )
+        response = self.client.post(
+            self._upload_url("left"),
+            {"file": _make_image_file(), "capture_datetime": CAPTURE_DT},
+            format="multipart",
+        )
+        self.assertEqual(response.status_code, 201)
+
+
+class CaptureDateTimeTests(FileUploadBaseTestCase):
+    """Tests for capture_datetime metadata."""
+
+    def test_capture_datetime_stored(self) -> None:
+        """capture_datetime from the payload is saved on the record."""
+        dt = "2026-05-21T10:30:00Z"
+        response = self.client.post(
+            self._upload_url("left"),
+            {"file": _make_image_file(), "capture_datetime": dt},
+            format="multipart",
+        )
+        self.assertEqual(response.status_code, 201)
+        img = RetinalImage.objects.get()
+        self.assertIsNotNone(img.capture_datetime)
+
+    def test_capture_datetime_required(self) -> None:
+        """Upload without capture_datetime returns 400."""
+        response = self.client.post(
+            self._upload_url("left"),
+            {"file": _make_image_file()},
+            format="multipart",
+        )
+        self.assertEqual(response.status_code, 400)
 
 
 class FileUploadEdgeCaseTests(FileUploadBaseTestCase):
@@ -206,11 +381,11 @@ class FileUploadEdgeCaseTests(FileUploadBaseTestCase):
         """Unknown file_type in URL returns 400."""
         response = self.client.post(
             self._upload_url("middle"),
-            {"file": _make_image_file()},
+            {"file": _make_image_file(), "capture_datetime": CAPTURE_DT},
             format="multipart",
         )
         self.assertEqual(response.status_code, 400)
-        self.assertIn("Invalid file type", response.data["error"])
+        self.assertEqual(response.data["code"], "invalid_file_type")
 
     def test_no_session_returns_404(self) -> None:
         """Upload for subject with no session returns 404."""
@@ -221,7 +396,7 @@ class FileUploadEdgeCaseTests(FileUploadBaseTestCase):
         )
         response = self.client.post(
             "/api/retinopathy/105-10-0099-9/left/",
-            {"file": _make_image_file()},
+            {"file": _make_image_file(), "capture_datetime": CAPTURE_DT},
             format="multipart",
         )
         self.assertEqual(response.status_code, 404)
@@ -230,7 +405,7 @@ class FileUploadEdgeCaseTests(FileUploadBaseTestCase):
         """Request without a file field returns 400."""
         response = self.client.post(
             self._upload_url("left"),
-            {},
+            {"capture_datetime": CAPTURE_DT},
             format="multipart",
         )
         self.assertEqual(response.status_code, 400)
@@ -240,7 +415,7 @@ class FileUploadEdgeCaseTests(FileUploadBaseTestCase):
         client = APIClient()
         response = client.post(
             self._upload_url("left"),
-            {"file": _make_image_file()},
+            {"file": _make_image_file(), "capture_datetime": CAPTURE_DT},
             format="multipart",
         )
         self.assertEqual(response.status_code, 401)
@@ -254,7 +429,7 @@ class FileUploadEdgeCaseTests(FileUploadBaseTestCase):
         ]:
             response = self.client.post(
                 self._upload_url(file_type),
-                {"file": make_file()},
+                {"file": make_file(), "capture_datetime": CAPTURE_DT},
                 format="multipart",
             )
             self.assertEqual(response.status_code, 201, f"Failed for {file_type}")
@@ -278,7 +453,7 @@ class FileUploadEdgeCaseTests(FileUploadBaseTestCase):
         )
         self.client.post(
             self._upload_url("left"),
-            {"file": _make_image_file()},
+            {"file": _make_image_file(), "capture_datetime": CAPTURE_DT},
             format="multipart",
         )
         img = RetinalImage.objects.get()
@@ -289,7 +464,10 @@ class FileUploadEdgeCaseTests(FileUploadBaseTestCase):
         """Stored filename uses UUID, not the original name."""
         self.client.post(
             self._upload_url("left"),
-            {"file": _make_image_file(name="patient_scan_secret.jpg")},
+            {
+                "file": _make_image_file(name="patient_scan_secret.jpg"),
+                "capture_datetime": CAPTURE_DT,
+            },
             format="multipart",
         )
         img = RetinalImage.objects.get()
@@ -301,7 +479,7 @@ class FileUploadEdgeCaseTests(FileUploadBaseTestCase):
         """Original file extension is preserved on stored filename."""
         self.client.post(
             self._upload_url("left"),
-            {"file": _make_image_file(name="scan.png", content_type="image/png")},
+            {"file": _make_png_file(name="scan.png"), "capture_datetime": CAPTURE_DT},
             format="multipart",
         )
         img = RetinalImage.objects.get()
@@ -316,7 +494,7 @@ class FileUploadEdgeCaseTests(FileUploadBaseTestCase):
         )
         self.client.post(
             self._upload_url("report"),
-            {"file": pdf},
+            {"file": pdf, "capture_datetime": CAPTURE_DT},
             format="multipart",
         )
         img = RetinalImage.objects.get()
@@ -331,7 +509,7 @@ class FileUploadEdgeCaseTests(FileUploadBaseTestCase):
         )
         self.client.post(
             self._upload_url("left"),
-            {"file": img_file},
+            {"file": img_file, "capture_datetime": CAPTURE_DT},
             format="multipart",
         )
         img = RetinalImage.objects.get()

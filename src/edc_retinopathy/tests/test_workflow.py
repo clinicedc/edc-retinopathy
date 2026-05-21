@@ -15,6 +15,8 @@ from rest_framework.test import APIClient
 from ..models import RetinalImage, RetinopathySession
 from .models import RegisteredSubject
 
+CAPTURE_DT = "2026-05-21T10:30:00Z"
+
 
 class FullWorkflowTests(TestCase):
     """Simulate the camera's complete four-step protocol."""
@@ -46,7 +48,7 @@ class FullWorkflowTests(TestCase):
         )
         return response.data
 
-    def _upload(self, file_type: str) -> dict:
+    def _upload(self, file_type: str, capture_dt: str = CAPTURE_DT) -> dict:
         if file_type == "report":
             f = SimpleUploadedFile(
                 name="report.pdf",
@@ -61,13 +63,17 @@ class FullWorkflowTests(TestCase):
             )
         response = self.client.post(
             f"/api/retinopathy/105-10-0001-2/{file_type}/",
-            {"file": f},
+            {"file": f, "capture_datetime": capture_dt},
             format="multipart",
         )
         return response.data
 
     def test_full_workflow(self) -> None:
         """Step 1: resolve, Step 2: left, Step 3: right, Step 4: report."""
+        # Step 0: Ping
+        response = self.client.get("/api/retinopathy/ping/")
+        self.assertEqual(response.status_code, 200)
+
         # Step 1: Resolve
         resolve_data = self._resolve()
         session_id = resolve_data["session_id"]
@@ -81,6 +87,13 @@ class FullWorkflowTests(TestCase):
         left_data = self._upload("left")
         self.assertEqual(left_data["session_id"], session_id)
         self.assertEqual(left_data["file_type"], "left")
+
+        # Check status mid-workflow
+        status_resp = self.client.get(
+            "/api/retinopathy/105-10-0001-2/status/"
+        )
+        self.assertEqual(status_resp.data["uploaded"], ["left"])
+        self.assertFalse(status_resp.data["complete"])
 
         # Step 3: Right eye
         right_data = self._upload("right")
@@ -104,6 +117,12 @@ class FullWorkflowTests(TestCase):
         for img in RetinalImage.objects.all():
             self.assertTrue((storage / img.stored_filename).exists())
 
+        # Status shows complete
+        status_resp = self.client.get(
+            "/api/retinopathy/105-10-0001-2/status/"
+        )
+        self.assertTrue(status_resp.data["complete"])
+
     def test_workflow_two_subjects_interleaved(self) -> None:
         """Two subjects uploading concurrently don't cross-link."""
         RegisteredSubject.objects.create(
@@ -116,12 +135,20 @@ class FullWorkflowTests(TestCase):
         # Resolve both subjects
         r1 = self.client.post(
             "/api/retinopathy/resolve/",
-            {"subject_identifier": "105-10-0001-2"},
+            {
+                "subject_identifier": "105-10-0001-2",
+                "initials": "JD",
+                "sex": "M",
+            },
             format="json",
         )
         r2 = self.client.post(
             "/api/retinopathy/resolve/",
-            {"subject_identifier": "105-10-0002-3"},
+            {
+                "subject_identifier": "105-10-0002-3",
+                "initials": "AB",
+                "sex": "F",
+            },
             format="json",
         )
         session1_id = r1.data["session_id"]
@@ -129,17 +156,21 @@ class FullWorkflowTests(TestCase):
         self.assertNotEqual(session1_id, session2_id)
 
         # Upload left eye for both
-        f1 = SimpleUploadedFile("left.jpg", b"\xff\xd8" + b"\x00" * 50, "image/jpeg")
-        f2 = SimpleUploadedFile("left.jpg", b"\xff\xd8" + b"\x00" * 50, "image/jpeg")
+        f1 = SimpleUploadedFile(
+            "left.jpg", b"\xff\xd8\xff" + b"\x00" * 50, "image/jpeg"
+        )
+        f2 = SimpleUploadedFile(
+            "left.jpg", b"\xff\xd8\xff" + b"\x00" * 50, "image/jpeg"
+        )
 
         resp1 = self.client.post(
             "/api/retinopathy/105-10-0001-2/left/",
-            {"file": f1},
+            {"file": f1, "capture_datetime": CAPTURE_DT},
             format="multipart",
         )
         resp2 = self.client.post(
             "/api/retinopathy/105-10-0002-3/left/",
-            {"file": f2},
+            {"file": f2, "capture_datetime": CAPTURE_DT},
             format="multipart",
         )
 
@@ -173,3 +204,59 @@ class FullWorkflowTests(TestCase):
         s2 = RetinopathySession.objects.get(pk=session2_id)
         self.assertEqual(s1.files.count(), 1)
         self.assertEqual(s2.files.count(), 1)
+
+    def test_workflow_retry_after_timeout(self) -> None:
+        """Camera retries an upload after a network timeout; gets 200."""
+        self._resolve()
+
+        # First upload succeeds
+        f1 = SimpleUploadedFile(
+            "left.jpg", b"\xff\xd8\xff" + b"\x00" * 100, "image/jpeg"
+        )
+        resp1 = self.client.post(
+            "/api/retinopathy/105-10-0001-2/left/",
+            {"file": f1, "capture_datetime": CAPTURE_DT},
+            format="multipart",
+        )
+        self.assertEqual(resp1.status_code, 201)
+
+        # Camera thinks it failed, retries
+        f2 = SimpleUploadedFile(
+            "left.jpg", b"\xff\xd8\xff" + b"\x00" * 100, "image/jpeg"
+        )
+        resp2 = self.client.post(
+            "/api/retinopathy/105-10-0001-2/left/",
+            {"file": f2, "capture_datetime": CAPTURE_DT},
+            format="multipart",
+        )
+        # Gets 200 (not 409) with the existing record
+        self.assertEqual(resp2.status_code, 200)
+        self.assertEqual(resp2.data["id"], resp1.data["id"])
+
+        # Only one file exists
+        self.assertEqual(RetinalImage.objects.count(), 1)
+
+    def test_workflow_with_capture_datetime(self) -> None:
+        """Full workflow with distinct capture_datetime on each image."""
+        self._resolve()
+
+        for file_type, dt in [
+            ("left", "2026-05-21T10:30:00Z"),
+            ("right", "2026-05-21T10:31:00Z"),
+        ]:
+            f = SimpleUploadedFile(
+                f"{file_type}.jpg",
+                b"\xff\xd8\xff" + b"\x00" * 100,
+                "image/jpeg",
+            )
+            response = self.client.post(
+                f"/api/retinopathy/105-10-0001-2/{file_type}/",
+                {"file": f, "capture_datetime": dt},
+                format="multipart",
+            )
+            self.assertEqual(response.status_code, 201)
+
+        images = RetinalImage.objects.order_by("file_type")
+        self.assertEqual(images.count(), 2)
+        for img in images:
+            self.assertIsNotNone(img.capture_datetime)

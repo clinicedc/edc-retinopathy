@@ -4,8 +4,11 @@ from __future__ import annotations
 
 from django.db import IntegrityError
 from django.test import TestCase
+from django.utils import timezone
 
 from ..models import RetinalImage, RetinopathySession
+
+NOW = timezone.now
 
 
 class RetinopathySessionModelTests(TestCase):
@@ -76,6 +79,7 @@ class RetinalImageModelTests(TestCase):
             file_type="left",
             original_filename="left_eye.jpg",
             stored_filename="abc123.jpg",
+            capture_datetime=NOW(),
         )
         self.assertEqual(img.file_type, "left")
         self.assertIsNotNone(img.pk)
@@ -86,6 +90,7 @@ class RetinalImageModelTests(TestCase):
             file_type="left",
             original_filename="left_eye.jpg",
             stored_filename="abc123.jpg",
+            capture_datetime=NOW(),
         )
         self.assertIn("left_eye.jpg", str(img))
 
@@ -96,6 +101,7 @@ class RetinalImageModelTests(TestCase):
             file_type="left",
             original_filename="first.jpg",
             stored_filename="aaa.jpg",
+            capture_datetime=NOW(),
         )
         with self.assertRaises(IntegrityError):
             RetinalImage.objects.create(
@@ -103,6 +109,7 @@ class RetinalImageModelTests(TestCase):
                 file_type="left",
                 original_filename="second.jpg",
                 stored_filename="bbb.jpg",
+                capture_datetime=NOW(),
             )
 
     def test_different_file_types_allowed(self) -> None:
@@ -113,6 +120,7 @@ class RetinalImageModelTests(TestCase):
                 file_type=ft,
                 original_filename=fn,
                 stored_filename=f"{ft}_stored",
+                capture_datetime=NOW(),
             )
         self.assertEqual(RetinalImage.objects.count(), 3)
 
@@ -126,12 +134,14 @@ class RetinalImageModelTests(TestCase):
             file_type="left",
             original_filename="a.jpg",
             stored_filename="aaa.jpg",
+            capture_datetime=NOW(),
         )
         RetinalImage.objects.create(
             session=session2,
             file_type="left",
             original_filename="b.jpg",
             stored_filename="bbb.jpg",
+            capture_datetime=NOW(),
         )
         self.assertEqual(RetinalImage.objects.count(), 2)
 
@@ -144,6 +154,7 @@ class RetinalImageModelTests(TestCase):
             file_type="left",
             original_filename="a.jpg",
             stored_filename="aaa.jpg",
+            capture_datetime=NOW(),
         )
         with self.assertRaises(ProtectedError):
             self.session.delete()
@@ -155,12 +166,14 @@ class RetinalImageModelTests(TestCase):
             file_type="left",
             original_filename="a.jpg",
             stored_filename="aaa.jpg",
+            capture_datetime=NOW(),
         )
         RetinalImage.objects.create(
             session=self.session,
             file_type="right",
             original_filename="b.jpg",
             stored_filename="bbb.jpg",
+            capture_datetime=NOW(),
         )
         self.assertEqual(self.session.files.count(), 2)
 
@@ -171,6 +184,7 @@ class RetinalImageModelTests(TestCase):
             file_type="left",
             original_filename="a.jpg",
             stored_filename="same_name.jpg",
+            capture_datetime=NOW(),
         )
         session2 = RetinopathySession.objects.create(
             subject_identifier="105-10-0002-3",
@@ -181,4 +195,15 @@ class RetinalImageModelTests(TestCase):
                 file_type="left",
                 original_filename="b.jpg",
                 stored_filename="same_name.jpg",
+                capture_datetime=NOW(),
+            )
+
+    def test_capture_datetime_required(self) -> None:
+        """capture_datetime is a required field."""
+        with self.assertRaises(IntegrityError):
+            RetinalImage.objects.create(
+                session=self.session,
+                file_type="left",
+                original_filename="a.jpg",
+                stored_filename="no_capture.jpg",
             )
