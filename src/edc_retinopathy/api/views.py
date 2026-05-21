@@ -460,21 +460,25 @@ class FileUploadView(APIView):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
-        # --- Idempotent duplicate check ---
+        # --- Replace existing file if re-uploaded ---
         existing = RetinalImage.objects.filter(
             session=session, file_type=file_type
         ).first()
         if existing:
+            # Remove old file from disk
+            old_path = _get_storage_dir() / existing.stored_filename
+            try:
+                os.unlink(str(old_path))
+            except OSError:
+                pass
             logger.info(
-                "Duplicate upload for %s/%s session=%s — returning existing",
-                subject_identifier,
+                "Replacing %s for %s session=%s (old=%s)",
                 file_type,
+                subject_identifier,
                 session.pk,
+                existing.stored_filename,
             )
-            return Response(
-                _image_response_data(existing),
-                status=status.HTTP_200_OK,
-            )
+            existing.delete()
 
         # --- Save file atomically ---
         ext = Path(uploaded_file.name).suffix.lower() or (

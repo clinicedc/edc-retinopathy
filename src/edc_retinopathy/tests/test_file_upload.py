@@ -143,24 +143,26 @@ class LeftEyeUploadTests(FileUploadBaseTestCase):
         self.assertTrue(stored_path.exists())
         self.assertGreater(stored_path.stat().st_size, 0)
 
-    def test_upload_left_eye_duplicate_idempotent(self) -> None:
-        """Second left eye upload for same session returns 200 with existing record."""
-        self.client.post(
+    def test_upload_left_eye_replacement(self) -> None:
+        """Second left eye upload replaces the first (201, new record)."""
+        resp1 = self.client.post(
             self._upload_url("left"),
             {"file": _make_image_file(), "capture_datetime": CAPTURE_DT},
             format="multipart",
         )
+        self.assertEqual(resp1.status_code, 201)
         response = self.client.post(
             self._upload_url("left"),
             {
                 "file": _make_image_file(name="another.jpg"),
-                "capture_datetime": CAPTURE_DT,
+                "capture_datetime": "2026-05-21T11:00:00Z",
             },
             format="multipart",
         )
-        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.status_code, 201)
         self.assertEqual(RetinalImage.objects.count(), 1)
         self.assertEqual(response.data["file_type"], "left")
+        self.assertNotEqual(response.data["id"], resp1.data["id"])
 
 
 class RightEyeUploadTests(FileUploadBaseTestCase):
@@ -176,8 +178,8 @@ class RightEyeUploadTests(FileUploadBaseTestCase):
         self.assertEqual(response.status_code, 201)
         self.assertEqual(response.data["file_type"], "right")
 
-    def test_upload_right_eye_duplicate_idempotent(self) -> None:
-        """Second right eye upload for same session returns 200."""
+    def test_upload_right_eye_replacement(self) -> None:
+        """Second right eye upload replaces the first (201)."""
         self.client.post(
             self._upload_url("right"),
             {"file": _make_image_file(), "capture_datetime": CAPTURE_DT},
@@ -185,10 +187,14 @@ class RightEyeUploadTests(FileUploadBaseTestCase):
         )
         response = self.client.post(
             self._upload_url("right"),
-            {"file": _make_image_file(), "capture_datetime": CAPTURE_DT},
+            {
+                "file": _make_image_file(),
+                "capture_datetime": "2026-05-21T11:00:00Z",
+            },
             format="multipart",
         )
-        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(RetinalImage.objects.count(), 1)
 
 
 class ReportUploadTests(FileUploadBaseTestCase):
@@ -219,8 +225,8 @@ class ReportUploadTests(FileUploadBaseTestCase):
         self.assertTrue(img.stored_filename.endswith(".pdf"))
         self.assertEqual(img.content_type, "application/pdf")
 
-    def test_upload_report_duplicate_idempotent(self) -> None:
-        """Second report upload for same session returns 200."""
+    def test_upload_report_replacement(self) -> None:
+        """Second report upload replaces the first (201)."""
         self.client.post(
             self._upload_url("report"),
             {"file": _make_pdf_file(), "capture_datetime": CAPTURE_DT},
@@ -228,10 +234,14 @@ class ReportUploadTests(FileUploadBaseTestCase):
         )
         response = self.client.post(
             self._upload_url("report"),
-            {"file": _make_pdf_file(), "capture_datetime": CAPTURE_DT},
+            {
+                "file": _make_pdf_file(),
+                "capture_datetime": "2026-05-21T11:00:00Z",
+            },
             format="multipart",
         )
-        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(RetinalImage.objects.count(), 1)
 
 
 class ContentValidationTests(FileUploadBaseTestCase):
