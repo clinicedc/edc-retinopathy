@@ -13,6 +13,7 @@ class RetinalImageAdmin(admin.ModelAdmin):
         "session",
         "content_type",
         "file_size",
+        "capture_datetime",
         "received_datetime",
     ]
     list_filter = ["file_type", "content_type"]
@@ -25,6 +26,8 @@ class RetinalImageAdmin(admin.ModelAdmin):
         "stored_filename",
         "content_type",
         "file_size",
+        "checksum",
+        "capture_datetime",
         "received_datetime",
     ]
 
