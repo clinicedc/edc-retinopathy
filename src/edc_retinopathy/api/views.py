@@ -154,6 +154,7 @@ def _image_response_data(retinal_image: RetinalImage) -> dict:
         "file_type": retinal_image.file_type,
         "original_filename": retinal_image.original_filename,
         "stored_filename": retinal_image.stored_filename,
+        "checksum": retinal_image.checksum,
     }
 
 
@@ -504,35 +505,35 @@ class FileUploadView(APIView):
                 pass
             raise
 
-        # --- Checksum verification ---
-        if checksum:
-            actual_hash = _compute_sha256(str(dest))
-            if actual_hash != checksum.lower():
-                # Delete the corrupt file
-                try:
-                    os.unlink(str(dest))
-                except OSError:
-                    pass
-                logger.warning(
-                    "Checksum mismatch for %s/%s session=%s: "
-                    "expected %s, got %s",
-                    subject_identifier,
-                    file_type,
-                    session.pk,
-                    checksum.lower(),
-                    actual_hash,
-                )
-                return Response(
-                    {
-                        "code": "checksum_mismatch",
-                        "error": (
-                            "File integrity check failed. "
-                            f"Expected SHA-256 {checksum}, "
-                            f"got {actual_hash}."
-                        ),
-                    },
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
+        # --- Compute SHA-256 of stored file (used for verification and response) ---
+        stored_checksum = _compute_sha256(str(dest))
+
+        if checksum and stored_checksum != checksum.lower():
+            # Delete the corrupt file
+            try:
+                os.unlink(str(dest))
+            except OSError:
+                pass
+            logger.warning(
+                "Checksum mismatch for %s/%s session=%s: "
+                "expected %s, got %s",
+                subject_identifier,
+                file_type,
+                session.pk,
+                checksum.lower(),
+                stored_checksum,
+            )
+            return Response(
+                {
+                    "code": "checksum_mismatch",
+                    "error": (
+                        "File integrity check failed. "
+                        f"Expected SHA-256 {checksum}, "
+                        f"got {stored_checksum}."
+                    ),
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         retinal_image = RetinalImage.objects.create(
             session=session,
@@ -542,6 +543,7 @@ class FileUploadView(APIView):
             content_type=uploaded_file.content_type or "",
             file_size=uploaded_file.size,
             capture_datetime=capture_datetime,
+            checksum=stored_checksum,
         )
 
         logger.info(
