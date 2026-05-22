@@ -461,27 +461,7 @@ class FileUploadView(APIView):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
-        # --- Replace existing file if re-uploaded ---
-        existing = RetinalImage.objects.filter(
-            session=session, file_type=file_type
-        ).first()
-        if existing:
-            # Remove old file from disk
-            old_path = _get_storage_dir() / existing.stored_filename
-            try:
-                os.unlink(str(old_path))
-            except OSError:
-                pass
-            logger.info(
-                "Replacing %s for %s session=%s (old=%s)",
-                file_type,
-                subject_identifier,
-                session.pk,
-                existing.stored_filename,
-            )
-            existing.delete()
-
-        # --- Save file atomically ---
+        # --- Save new file atomically (before deleting old) ---
         ext = Path(uploaded_file.name).suffix.lower() or (
             ".pdf" if file_type == "report" else ".jpg"
         )
@@ -504,6 +484,26 @@ class FileUploadView(APIView):
             except OSError:
                 pass
             raise
+
+        # --- Replace existing record if re-uploaded ---
+        existing = RetinalImage.objects.filter(
+            session=session, file_type=file_type
+        ).first()
+        if existing:
+            # Remove old file from disk (new file is already safely written)
+            old_path = _get_storage_dir() / existing.stored_filename
+            try:
+                os.unlink(str(old_path))
+            except OSError:
+                pass
+            logger.info(
+                "Replacing %s for %s session=%s (old=%s)",
+                file_type,
+                subject_identifier,
+                session.pk,
+                existing.stored_filename,
+            )
+            existing.delete()
 
         # --- Compute SHA-256 of stored file (used for verification and response) ---
         stored_checksum = _compute_sha256(str(dest))
