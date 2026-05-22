@@ -159,7 +159,7 @@ def _image_response_data(retinal_image: RetinalImage) -> dict:
 
 def _find_session(
     subject_identifier: str,
-    session_id: int | None = None,
+    session_id: str | None = None,
 ) -> RetinopathySession | None:
     """Find an active session by subject_identifier.
 
@@ -440,7 +440,7 @@ class FileUploadView(APIView):
 
         # --- Find session (by explicit session_id or most recent) ---
         raw_session_id = request.query_params.get("session_id")
-        session_id = int(raw_session_id) if raw_session_id else None
+        session_id = raw_session_id if raw_session_id else None
 
         session = _find_session(subject_identifier, session_id=session_id)
         if not session:

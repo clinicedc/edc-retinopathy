@@ -622,7 +622,9 @@ class SessionIdParamTests(FileUploadBaseTestCase):
 
     def test_invalid_session_id_returns_404(self) -> None:
         """Non-existent session_id returns 404."""
-        url = f"{self._upload_url('left')}?session_id=99999"
+        import uuid as _uuid
+
+        url = f"{self._upload_url('left')}?session_id={_uuid.uuid4()}"
         response = self.client.post(
             url,
             {"file": _make_image_file(), "capture_datetime": CAPTURE_DT},
