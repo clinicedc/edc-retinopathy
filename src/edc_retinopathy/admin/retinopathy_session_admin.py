@@ -20,6 +20,7 @@ class RetinopathySessionAdmin(admin.ModelAdmin):
     list_filter = ["site_id", "device_id", "created_datetime"]
     search_fields = ["subject_identifier", "initials"]
     readonly_fields = [
+        "id",
         "subject_identifier",
         "initials",
         "sex",

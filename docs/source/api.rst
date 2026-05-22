@@ -289,19 +289,44 @@ Success response (201)
 
    {
      "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-     "session_id": 42,
+     "session_id": "f8e7d6c5-b4a3-2190-fedc-ba9876543210",
      "file_type": "left",
      "original_filename": "left_eye.jpg",
-     "stored_filename": "8f3a9b2c1d4e5f6a7b8c9d0e1f2a3b4c.jpg"
+     "stored_filename": "8f3a9b2c1d4e5f6a7b8c9d0e1f2a3b4c.jpg",
+     "checksum": "92bdbcf8e6dd7955bdf5c8b20985fdac2192791db98ac2ac7c403efb821aeae0"
    }
 
-Retry behaviour
-^^^^^^^^^^^^^^^
+The ``checksum`` field is always returned and contains the SHA-256 hex
+digest of the file as stored on the server.
+
+Checksum verification
+^^^^^^^^^^^^^^^^^^^^^
+
+The camera may optionally include a ``checksum`` field (SHA-256 hex digest)
+in the upload request. When provided:
+
+- **Match:** The server confirms the stored file is identical to what was
+  sent. The upload succeeds with ``201 Created`` and the response includes
+  the same checksum.
+- **Mismatch:** The stored file is corrupt or was altered in transit. The
+  server deletes the file and returns ``400 Bad Request`` with
+  ``"code": "checksum_mismatch"``. The camera should retry the upload.
+
+Even when the camera does **not** send a checksum, the response always
+includes one. The camera can compare this against its own locally computed
+SHA-256 to verify end-to-end integrity after the fact.
+
+Re-upload behaviour
+^^^^^^^^^^^^^^^^^^^
 
 If the same file type has already been uploaded for the current session,
-the server returns ``200 OK`` with the existing record. This makes
-uploads **idempotent** — the camera can safely retry after a network
-timeout without creating duplicates.
+re-uploading **replaces** the existing file. The old file is deleted from
+disk, the old record is removed, and the new file is saved. The server
+returns ``201 Created`` with the new record.
+
+This allows the camera to correct a capture (e.g. with a different
+``capture_datetime``) by simply re-sending — the latest upload always wins.
+Only one file per type per session is stored at any time.
 
 
 Step 3: Upload Right Eye Image
@@ -512,8 +537,9 @@ One record per uploaded file, linked to a session.
      - DateTimeField
      - Timestamp of upload (auto).
 
-**Constraints:** A unique constraint on ``(session, file_type)`` prevents
-duplicate uploads of the same type within a session.
+**Constraints:** A unique constraint on ``(session, file_type)`` ensures
+at most one file per type per session. Re-uploading replaces the existing
+file (the old record is deleted before the new one is created).
 
 
 Django Configuration

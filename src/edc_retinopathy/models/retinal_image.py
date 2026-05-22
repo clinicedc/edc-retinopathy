@@ -60,6 +60,13 @@ class RetinalImage(models.Model):
         help_text="File size in bytes.",
     )
 
+    checksum = models.CharField(
+        max_length=64,
+        blank=True,
+        default="",
+        help_text="SHA-256 hex digest of the stored file.",
+    )
+
     capture_datetime = models.DateTimeField(
         help_text="Capture timestamp as reported by the camera.",
     )

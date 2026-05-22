@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import uuid
 from typing import ClassVar
 
 from django.db import models
@@ -11,6 +12,8 @@ class RetinopathySession(models.Model):
     Created when the camera resolves a subject identifier. All uploaded
     files (left eye, right eye, report) are linked to this session.
     """
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
 
     subject_identifier = models.CharField(max_length=50, db_index=True)
 

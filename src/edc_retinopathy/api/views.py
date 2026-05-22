@@ -30,6 +30,7 @@ _PDF_MAGIC = b"%PDF"
 # Default settings
 _DEFAULT_MAX_FILE_SIZE_MB = 10
 _DEFAULT_SESSION_EXPIRE_MINUTES = 120
+_DEFAULT_SESSION_REACTIVATION_HOURS = 24
 
 
 def _get_max_file_size_bytes() -> int:
@@ -43,6 +44,16 @@ def _get_session_expire_minutes() -> int:
             settings,
             "EDC_RETINOPATHY_SESSION_EXPIRE_MINUTES",
             _DEFAULT_SESSION_EXPIRE_MINUTES,
+        )
+    )
+
+
+def _get_session_reactivation_hours() -> int:
+    return int(
+        getattr(
+            settings,
+            "EDC_RETINOPATHY_SESSION_REACTIVATION_HOURS",
+            _DEFAULT_SESSION_REACTIVATION_HOURS,
         )
     )
 
@@ -143,12 +154,13 @@ def _image_response_data(retinal_image: RetinalImage) -> dict:
         "file_type": retinal_image.file_type,
         "original_filename": retinal_image.original_filename,
         "stored_filename": retinal_image.stored_filename,
+        "checksum": retinal_image.checksum,
     }
 
 
 def _find_session(
     subject_identifier: str,
-    session_id: int | None = None,
+    session_id: str | None = None,
 ) -> RetinopathySession | None:
     """Find an active session by subject_identifier.
 
@@ -240,8 +252,10 @@ class ResolveSubjectView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # --- Try to reactivate an incomplete session (within 24 hours) ---
-        reactivation_cutoff = timezone.now() - timedelta(hours=24)
+        # --- Try to reactivate an incomplete session ---
+        reactivation_cutoff = timezone.now() - timedelta(
+            hours=_get_session_reactivation_hours()
+        )
         existing_session = (
             RetinopathySession.objects.filter(
                 subject_identifier=subject_identifier,
@@ -427,7 +441,7 @@ class FileUploadView(APIView):
 
         # --- Find session (by explicit session_id or most recent) ---
         raw_session_id = request.query_params.get("session_id")
-        session_id = int(raw_session_id) if raw_session_id else None
+        session_id = raw_session_id if raw_session_id else None
 
         session = _find_session(subject_identifier, session_id=session_id)
         if not session:
@@ -447,23 +461,7 @@ class FileUploadView(APIView):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
-        # --- Idempotent duplicate check ---
-        existing = RetinalImage.objects.filter(
-            session=session, file_type=file_type
-        ).first()
-        if existing:
-            logger.info(
-                "Duplicate upload for %s/%s session=%s — returning existing",
-                subject_identifier,
-                file_type,
-                session.pk,
-            )
-            return Response(
-                _image_response_data(existing),
-                status=status.HTTP_200_OK,
-            )
-
-        # --- Save file atomically ---
+        # --- Save new file atomically (before deleting old) ---
         ext = Path(uploaded_file.name).suffix.lower() or (
             ".pdf" if file_type == "report" else ".jpg"
         )
@@ -480,42 +478,78 @@ class FileUploadView(APIView):
                 for chunk in uploaded_file.chunks():
                     out.write(chunk)
             os.rename(tmp_path, str(dest))
-        except BaseException:
+        except OSError as e:
             try:
                 os.unlink(tmp_path)
             except OSError:
                 pass
-            raise
+            logger.exception(
+                "Failed to write %s for %s session=%s: %s",
+                file_type,
+                subject_identifier,
+                session.pk,
+                e,
+            )
+            return Response(
+                {
+                    "code": "storage_error",
+                    "error": (
+                        "File could not be saved to storage. "
+                        "Please retry the upload."
+                    ),
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
 
-        # --- Checksum verification ---
-        if checksum:
-            actual_hash = _compute_sha256(str(dest))
-            if actual_hash != checksum.lower():
-                # Delete the corrupt file
-                try:
-                    os.unlink(str(dest))
-                except OSError:
-                    pass
-                logger.warning(
-                    "Checksum mismatch for %s/%s session=%s: "
-                    "expected %s, got %s",
-                    subject_identifier,
-                    file_type,
-                    session.pk,
-                    checksum.lower(),
-                    actual_hash,
-                )
-                return Response(
-                    {
-                        "code": "checksum_mismatch",
-                        "error": (
-                            "File integrity check failed. "
-                            f"Expected SHA-256 {checksum}, "
-                            f"got {actual_hash}."
-                        ),
-                    },
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
+        # --- Replace existing record if re-uploaded ---
+        existing = RetinalImage.objects.filter(
+            session=session, file_type=file_type
+        ).first()
+        if existing:
+            # Remove old file from disk (new file is already safely written)
+            old_path = _get_storage_dir() / existing.stored_filename
+            try:
+                os.unlink(str(old_path))
+            except OSError:
+                pass
+            logger.info(
+                "Replacing %s for %s session=%s (old=%s)",
+                file_type,
+                subject_identifier,
+                session.pk,
+                existing.stored_filename,
+            )
+            existing.delete()
+
+        # --- Compute SHA-256 of stored file (used for verification and response) ---
+        stored_checksum = _compute_sha256(str(dest))
+
+        if checksum and stored_checksum != checksum.lower():
+            # Delete the corrupt file
+            try:
+                os.unlink(str(dest))
+            except OSError:
+                pass
+            logger.warning(
+                "Checksum mismatch for %s/%s session=%s: "
+                "expected %s, got %s",
+                subject_identifier,
+                file_type,
+                session.pk,
+                checksum.lower(),
+                stored_checksum,
+            )
+            return Response(
+                {
+                    "code": "checksum_mismatch",
+                    "error": (
+                        "File integrity check failed. "
+                        f"Expected SHA-256 {checksum}, "
+                        f"got {stored_checksum}."
+                    ),
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         retinal_image = RetinalImage.objects.create(
             session=session,
@@ -525,6 +559,7 @@ class FileUploadView(APIView):
             content_type=uploaded_file.content_type or "",
             file_size=uploaded_file.size,
             capture_datetime=capture_datetime,
+            checksum=stored_checksum,
         )
 
         logger.info(

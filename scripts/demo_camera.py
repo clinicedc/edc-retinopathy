@@ -6,11 +6,11 @@ Usage:
         --subject 105-10-0001-2 --initials JD --sex M --age 35
 
     # Minimal (uses defaults for optional fields):
-    python demo_camera.py --host http://localhost:8000 --token abc123 \  # ggignore
+    python demo_camera.py --host http://localhost:8000 --token abc123 \\ # ggignore
         --subject 105-10-0001-2 --initials JD --sex M
 
     # With real image files:
-    python demo_camera.py --host http://localhost:8000 --token abc123 \  # ggignore
+    python demo_camera.py --host http://localhost:8000 --token abc123 \\ # ggignore
         --subject 105-10-0001-2 --initials JD --sex M \
         --left-image /path/to/left.jpg \
         --right-image /path/to/right.jpg \
@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import json
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -68,6 +69,9 @@ def main() -> None:
     parser.add_argument(
         "--checksum", action="store_true", help="Send SHA-256 checksums"
     )
+    parser.add_argument(
+        "--verbose", action="store_true", help="Print request/response JSON payloads"
+    )
     args = parser.parse_args()
 
     base = args.host.rstrip("/") + "/api/retinopathy"
@@ -83,6 +87,8 @@ def main() -> None:
     r = requests.get(f"{base}/ping/", headers=headers, timeout=10)
     if r.status_code == 200:
         print(f"OK ({r.json()})")
+        if args.verbose:
+            print(f"  Response: {json.dumps(r.json(), indent=2)}")
     else:
         print(f"FAILED {r.status_code}: {r.text}")
         sys.exit(1)
@@ -101,17 +107,30 @@ def main() -> None:
     if args.site_id:
         payload["site_id"] = args.site_id
 
-    r = requests.post(
-        f"{base}/resolve/", json=payload, headers=headers, timeout=10
-    )
+    if args.verbose:
+        print()
+        print(f"  Request:  POST {base}/resolve/")
+        print(f"  Payload:  {json.dumps(payload, indent=2)}")
+
+    r = requests.post(f"{base}/resolve/", json=payload, headers=headers, timeout=10)
     if r.status_code in (200, 201):
         data = r.json()
         session_id = data["session_id"]
         reactivated = data.get("reactivated", False)
         label = "reactivated" if reactivated else "created"
-        print(f"OK — session {session_id} ({label})")
+        print(
+            f"OK — {data['subject_identifier']}, "
+            f"session {session_id} ({label})"
+        )
+        if args.verbose:
+            print(f"  Response: {json.dumps(data, indent=2)}")
     else:
         print(f"FAILED {r.status_code}: {r.text}")
+        if args.verbose:
+            try:
+                print(f"  Response: {json.dumps(r.json(), indent=2)}")
+            except ValueError:
+                pass
         sys.exit(1)
 
     # --- Step 2-4: Upload files ---
@@ -146,32 +165,46 @@ def main() -> None:
             form_data["checksum"] = (None, sha256_bytes(file_data))
 
         url = f"{base}/{args.subject}/{file_type}/?session_id={session_id}"
-        r = requests.post(
-            url, files=files, data=form_data, headers=headers, timeout=30
-        )
+
+        if args.verbose:
+            print()
+            print(f"  Request:  POST {url}")
+            print(f"  Fields:   capture_datetime={now_iso}, file={filename} "
+                  f"({len(file_data)} bytes, {mime})")
+            if args.checksum:
+                print(f"  Checksum: {sha256_bytes(file_data)}")
+
+        r = requests.post(url, files=files, data=form_data, headers=headers, timeout=30)
         if r.status_code in (200, 201):
             data = r.json()
-            status_label = "new" if r.status_code == 201 else "already exists"
-            print(
-                f"OK — {data['stored_filename']} ({status_label})"
-            )
+            status_label = "new" if r.status_code == 201 else "replaced"
+            print(f"OK — {data['stored_filename']} ({status_label})")
+            if args.verbose:
+                print(f"  Response: {json.dumps(data, indent=2)}")
         else:
             print(f"FAILED {r.status_code}: {r.text}")
+            if args.verbose:
+                try:
+                    print(f"  Response: {json.dumps(r.json(), indent=2)}")
+                except ValueError:
+                    pass
             continue
 
     # --- Final: Check status ---
     print()
     print("Session status ...", end=" ", flush=True)
-    r = requests.get(
-        f"{base}/{args.subject}/status/", headers=headers, timeout=10
-    )
+    status_url = f"{base}/{args.subject}/status/"
+    r = requests.get(status_url, headers=headers, timeout=10)
     if r.status_code == 200:
         data = r.json()
-        print(f"OK")
+        print("OK")
+        print(f"  Subject:  {data['subject_identifier']}")
         print(f"  Session:  {data['session_id']}")
         print(f"  Uploaded: {data['uploaded']}")
         print(f"  Missing:  {data['missing']}")
         print(f"  Complete: {data['complete']}")
+        if args.verbose:
+            print(f"  Response: {json.dumps(data, indent=2)}")
     else:
         print(f"FAILED {r.status_code}: {r.text}")
 

@@ -231,7 +231,7 @@ class FullWorkflowTests(TestCase):
         self.assertTrue(status_resp.data["complete"])
 
     def test_workflow_retry_after_timeout(self) -> None:
-        """Camera retries an upload after a network timeout; gets 200."""
+        """Camera retries an upload after a network timeout; replaces."""
         self._resolve()
 
         # First upload succeeds
@@ -245,7 +245,7 @@ class FullWorkflowTests(TestCase):
         )
         self.assertEqual(resp1.status_code, 201)
 
-        # Camera thinks it failed, retries
+        # Camera thinks it failed, retries with same capture_datetime
         f2 = SimpleUploadedFile(
             "left.jpg", b"\xff\xd8\xff" + b"\x00" * 100, "image/jpeg"
         )
@@ -254,11 +254,11 @@ class FullWorkflowTests(TestCase):
             {"file": f2, "capture_datetime": CAPTURE_DT},
             format="multipart",
         )
-        # Gets 200 (not 409) with the existing record
-        self.assertEqual(resp2.status_code, 200)
-        self.assertEqual(resp2.data["id"], resp1.data["id"])
+        # Replacement — new record, 201
+        self.assertEqual(resp2.status_code, 201)
+        self.assertNotEqual(resp2.data["id"], resp1.data["id"])
 
-        # Only one file exists
+        # Only one file exists (old was replaced)
         self.assertEqual(RetinalImage.objects.count(), 1)
 
     def test_workflow_with_capture_datetime(self) -> None:
