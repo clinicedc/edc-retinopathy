@@ -1,0 +1,35 @@
+---
+name: build
+
+on: [push, pull_request]
+
+jobs:
+  build:
+    name: build (Python ${{ matrix.python-version }}, Django ${{ matrix.django-version }})
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.12', '3.13', '3.14']
+        django-version: ['5.2', '6.0']
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv and set the python version
+        uses: astral-sh/setup-uv@v6
+        with:
+          python-version: ${{ matrix.python-version }}
+          enable-cache: true
+
+      - name: Install dependencies
+        run: |
+          uv sync --dev
+          uv pip install "django~=${{ matrix.django-version }}.0"
+
+      - name: Run tests
+        run: |
+          uv run --dev python runtests.py
+        env:
+          DJANGO_SETTINGS_MODULE: edc_retinopathy.tests.settings
