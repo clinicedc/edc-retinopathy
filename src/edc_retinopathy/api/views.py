@@ -478,12 +478,28 @@ class FileUploadView(APIView):
                 for chunk in uploaded_file.chunks():
                     out.write(chunk)
             os.rename(tmp_path, str(dest))
-        except BaseException:
+        except OSError as e:
             try:
                 os.unlink(tmp_path)
             except OSError:
                 pass
-            raise
+            logger.exception(
+                "Failed to write %s for %s session=%s: %s",
+                file_type,
+                subject_identifier,
+                session.pk,
+                e,
+            )
+            return Response(
+                {
+                    "code": "storage_error",
+                    "error": (
+                        "File could not be saved to storage. "
+                        "Please retry the upload."
+                    ),
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
 
         # --- Replace existing record if re-uploaded ---
         existing = RetinalImage.objects.filter(
