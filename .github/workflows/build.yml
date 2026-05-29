@@ -31,5 +31,3 @@ jobs:
       - name: Run tests
         run: |
           uv run --dev python runtests.py
-        env:
-          DJANGO_SETTINGS_MODULE: edc_retinopathy.tests.settings

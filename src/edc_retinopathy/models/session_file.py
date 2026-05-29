@@ -1,40 +1,30 @@
 from __future__ import annotations
 
-import uuid
-from typing import ClassVar
-
 from django.db import models
+from edc_model.models import BaseUuidModel, HistoricalRecords
+from edc_prn.prn_model_manager import PrnModelManager
+from edc_sites.managers import CurrentSiteManager
 
-LEFT_EYE = "left"
-RIGHT_EYE = "right"
-REPORT = "report"
-
-FILE_TYPE_CHOICES = [
-    (LEFT_EYE, "Left eye"),
-    (RIGHT_EYE, "Right eye"),
-    (REPORT, "Report"),
-]
+from ..choices import FILE_CONTENT_TYPE_CHOICES, FILE_TYPE_CHOICES
 
 
-class RetinalImage(models.Model):
+class SessionFile(BaseUuidModel):
     """Stores metadata for files received from the retinopathy camera.
 
-    Each file is linked to a RetinopathySession and categorised as
-    a left-eye image, right-eye image, or report PDF.
+    Each file is linked to a CameraSession and categorized as
+    a left-eye image, right-eye image, or report (PDF or HTML).
     """
 
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-
     session = models.ForeignKey(
-        "edc_retinopathy.RetinopathySession",
+        "edc_retinopathy.CameraSession",
         on_delete=models.PROTECT,
         related_name="files",
     )
 
     file_type = models.CharField(
-        max_length=10,
+        max_length=20,
         choices=FILE_TYPE_CHOICES,
-        help_text="Category of this file: left eye, right eye, or report.",
+        help_text="Category: left eye, right eye, left/right report, or combined report.",
     )
 
     original_filename = models.CharField(
@@ -48,11 +38,13 @@ class RetinalImage(models.Model):
         help_text="UUID-based filename used on disk.",
     )
 
-    content_type = models.CharField(
+    file_content_type = models.CharField(
+        verbose_name="content type",
         max_length=100,
+        choices=FILE_CONTENT_TYPE_CHOICES,
         blank=True,
         default="",
-        help_text="MIME type of the uploaded file (e.g. image/jpeg, application/pdf).",
+        help_text="MIME type of the uploaded file.",
     )
 
     file_size = models.PositiveIntegerField(
@@ -73,16 +65,18 @@ class RetinalImage(models.Model):
 
     received_datetime = models.DateTimeField(auto_now_add=True)
 
-    class Meta:
-        ordering: ClassVar = ["-received_datetime"]
-        verbose_name = "Retinal Image"
-        verbose_name_plural = "Retinal Images"
-        constraints = [
-            models.UniqueConstraint(
-                fields=["session", "file_type"],
-                name="unique_session_file_type",
-            ),
-        ]
+    objects = PrnModelManager()
+    history = HistoricalRecords(inherit=True)
 
     def __str__(self) -> str:
         return f"{self.original_filename} ({self.get_file_type_display()})"
+
+    class Meta(BaseUuidModel.Meta):
+        verbose_name = "Session file"
+        verbose_name_plural = "Session files"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["session", "original_filename"],
+                name="unique_session_orig_filename",
+            ),
+        ]

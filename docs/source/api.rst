@@ -497,7 +497,7 @@ encounter.
      - DateTimeField
      - Timestamp of session creation (auto).
 
-RetinalImage
+SessionFile
 ------------
 
 One record per uploaded file, linked to a session.

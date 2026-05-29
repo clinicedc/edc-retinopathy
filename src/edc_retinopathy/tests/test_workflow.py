@@ -12,7 +12,7 @@ from django.test import TestCase
 from rest_framework.authtoken.models import Token
 from rest_framework.test import APIClient
 
-from ..models import RetinalImage, RetinopathySession
+from ..models import CameraSession, SessionFile
 from .models import RegisteredSubject
 
 CAPTURE_DT = "2026-05-21T10:30:00Z"
@@ -55,6 +55,12 @@ class FullWorkflowTests(TestCase):
                 content=b"%PDF-1.4" + b"\x00" * 200,
                 content_type="application/pdf",
             )
+        elif file_type in ("left_report", "right_report"):
+            f = SimpleUploadedFile(
+                name=f"{file_type}.html",
+                content=b"<!DOCTYPE html><html><body>Report</body></html>",
+                content_type="text/html",
+            )
         else:
             f = SimpleUploadedFile(
                 name=f"{file_type}_eye.jpg",
@@ -69,7 +75,7 @@ class FullWorkflowTests(TestCase):
         return response.data
 
     def test_full_workflow(self) -> None:
-        """Step 1: resolve, Step 2: left, Step 3: right, Step 4: report."""
+        """Resolve, upload left, right, left_report, right_report."""
         # Step 0: Ping
         response = self.client.get("/api/retinopathy/ping/")
         self.assertEqual(response.status_code, 200)
@@ -78,8 +84,8 @@ class FullWorkflowTests(TestCase):
         resolve_data = self._resolve()
         session_id = resolve_data["session_id"]
 
-        self.assertEqual(RetinopathySession.objects.count(), 1)
-        session = RetinopathySession.objects.get(pk=session_id)
+        self.assertEqual(CameraSession.objects.count(), 1)
+        session = CameraSession.objects.get(pk=session_id)
         self.assertEqual(session.subject_identifier, "105-10-0001-2")
         self.assertEqual(session.device_id, "CAM-001")
 
@@ -100,21 +106,28 @@ class FullWorkflowTests(TestCase):
         self.assertEqual(right_data["session_id"], session_id)
         self.assertEqual(right_data["file_type"], "right")
 
-        # Step 4: Report
-        report_data = self._upload("report")
-        self.assertEqual(report_data["session_id"], session_id)
-        self.assertEqual(report_data["file_type"], "report")
+        # Step 4: Left eye report
+        left_report_data = self._upload("left_report")
+        self.assertEqual(left_report_data["session_id"], session_id)
+        self.assertEqual(left_report_data["file_type"], "left_report")
+
+        # Step 5: Right eye report
+        right_report_data = self._upload("right_report")
+        self.assertEqual(right_report_data["session_id"], session_id)
+        self.assertEqual(right_report_data["file_type"], "right_report")
 
         # Verify final state
-        self.assertEqual(RetinalImage.objects.count(), 3)
-        self.assertEqual(session.files.count(), 3)
+        self.assertEqual(SessionFile.objects.count(), 4)
+        self.assertEqual(session.files.count(), 4)
 
         file_types = set(session.files.values_list("file_type", flat=True))
-        self.assertEqual(file_types, {"left", "right", "report"})
+        self.assertEqual(
+            file_types, {"left", "right", "left_report", "right_report"}
+        )
 
         # Verify all files exist on disk
         storage = Path(settings.EDC_RETINOPATHY_STORAGE_DIR) / "images"
-        for img in RetinalImage.objects.all():
+        for img in SessionFile.objects.all():
             self.assertTrue((storage / img.stored_filename).exists())
 
         # Status shows complete
@@ -178,8 +191,8 @@ class FullWorkflowTests(TestCase):
         self.assertEqual(resp2.data["session_id"], session2_id)
 
         # Each session has exactly one file
-        s1 = RetinopathySession.objects.get(pk=session1_id)
-        s2 = RetinopathySession.objects.get(pk=session2_id)
+        s1 = CameraSession.objects.get(pk=session1_id)
+        s2 = CameraSession.objects.get(pk=session2_id)
         self.assertEqual(s1.files.count(), 1)
         self.assertEqual(s2.files.count(), 1)
 
@@ -190,7 +203,8 @@ class FullWorkflowTests(TestCase):
         session1_id = r1["session_id"]
         self._upload("left")
         self._upload("right")
-        self._upload("report")
+        self._upload("left_report")
+        self._upload("right_report")
 
         # Second visit — new session since first is complete
         r2 = self._resolve()
@@ -220,9 +234,10 @@ class FullWorkflowTests(TestCase):
         )
         self.assertEqual(status_resp.data["uploaded"], ["left"])
 
-        # Continue with right eye and report
+        # Continue with remaining uploads
         self._upload("right")
-        self._upload("report")
+        self._upload("left_report")
+        self._upload("right_report")
 
         # Session is now complete
         status_resp = self.client.get(
@@ -259,7 +274,7 @@ class FullWorkflowTests(TestCase):
         self.assertNotEqual(resp2.data["id"], resp1.data["id"])
 
         # Only one file exists (old was replaced)
-        self.assertEqual(RetinalImage.objects.count(), 1)
+        self.assertEqual(SessionFile.objects.count(), 1)
 
     def test_workflow_with_capture_datetime(self) -> None:
         """Full workflow with distinct capture_datetime on each image."""
@@ -281,7 +296,7 @@ class FullWorkflowTests(TestCase):
             )
             self.assertEqual(response.status_code, 201)
 
-        images = RetinalImage.objects.order_by("file_type")
+        images = SessionFile.objects.order_by("file_type")
         self.assertEqual(images.count(), 2)
         for img in images:
             self.assertIsNotNone(img.capture_datetime)
