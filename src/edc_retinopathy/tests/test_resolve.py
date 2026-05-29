@@ -10,7 +10,7 @@ from django.utils import timezone
 from rest_framework.authtoken.models import Token
 from rest_framework.test import APIClient
 
-from ..models import RetinalImage, RetinopathySession
+from ..models import CameraSession, SessionFile
 from .models import RegisteredSubject
 
 
@@ -43,12 +43,10 @@ class ResolveSubjectTests(TestCase):
             format="json",
         )
         self.assertEqual(response.status_code, 201)
-        self.assertEqual(
-            response.data["subject_identifier"], "105-10-0001-2"
-        )
+        self.assertEqual(response.data["subject_identifier"], "105-10-0001-2")
         self.assertIn("session_id", response.data)
         self.assertFalse(response.data["reactivated"])
-        self.assertEqual(RetinopathySession.objects.count(), 1)
+        self.assertEqual(CameraSession.objects.count(), 1)
 
     def test_resolve_creates_session_with_metadata(self) -> None:
         """Session stores all camera-provided metadata."""
@@ -64,7 +62,7 @@ class ResolveSubjectTests(TestCase):
             },
             format="json",
         )
-        session = RetinopathySession.objects.get()
+        session = CameraSession.objects.get()
         self.assertEqual(session.initials, "JD")
         self.assertEqual(session.sex, "M")
         self.assertEqual(session.age, 35)
@@ -84,7 +82,7 @@ class ResolveSubjectTests(TestCase):
         )
         self.assertEqual(response.status_code, 400)
         self.assertIn("Subject identifier not found", response.data["errors"][0])
-        self.assertEqual(RetinopathySession.objects.count(), 0)
+        self.assertEqual(CameraSession.objects.count(), 0)
 
     def test_resolve_initials_mismatch(self) -> None:
         """Mismatched initials returns 400."""
@@ -275,7 +273,7 @@ class ResolveSubjectTests(TestCase):
         self.assertEqual(r2.status_code, 200)
         self.assertTrue(r2.data["reactivated"])
         self.assertEqual(r2.data["session_id"], session_id)
-        self.assertEqual(RetinopathySession.objects.count(), 1)
+        self.assertEqual(CameraSession.objects.count(), 1)
 
     def test_resolve_creates_new_after_complete(self) -> None:
         """New session created when previous session is complete."""
@@ -288,11 +286,11 @@ class ResolveSubjectTests(TestCase):
             },
             format="json",
         )
-        session = RetinopathySession.objects.get(pk=r1.data["session_id"])
+        session = CameraSession.objects.get(pk=r1.data["session_id"])
 
         # Complete the session
-        for ft in ("left", "right", "report"):
-            RetinalImage.objects.create(
+        for ft in ("left", "right", "left_report", "right_report"):
+            SessionFile.objects.create(
                 session=session,
                 file_type=ft,
                 original_filename=f"{ft}.jpg",
@@ -313,7 +311,7 @@ class ResolveSubjectTests(TestCase):
         self.assertEqual(r2.status_code, 201)
         self.assertFalse(r2.data["reactivated"])
         self.assertNotEqual(r2.data["session_id"], r1.data["session_id"])
-        self.assertEqual(RetinopathySession.objects.count(), 2)
+        self.assertEqual(CameraSession.objects.count(), 2)
 
     def test_resolve_no_reactivation_after_24_hours(self) -> None:
         """Sessions older than 24 hours are not reactivated."""
@@ -328,9 +326,9 @@ class ResolveSubjectTests(TestCase):
         )
         # Age the session beyond 24 hours
         old_time = timezone.now() - timedelta(hours=25)
-        RetinopathySession.objects.filter(
-            pk=r1.data["session_id"]
-        ).update(created_datetime=old_time)
+        CameraSession.objects.filter(pk=r1.data["session_id"]).update(
+            created_datetime=old_time
+        )
 
         r2 = self.client.post(
             self.url,

@@ -1,7 +1,9 @@
-from .retinal_image_admin import RetinalImageAdmin
-from .retinopathy_session_admin import RetinopathySessionAdmin
+from .autocomplete_admin import RegisteredSubjectProxyAdmin
+from .camera_session_admin import CameraSessionAdmin
+from .session_file_admin import SessionFileAdmin
 
 __all__ = [
-    "RetinalImageAdmin",
-    "RetinopathySessionAdmin",
+    "CameraSessionAdmin",
+    "SessionFileAdmin",
+    "RegisteredSubjectProxyAdmin",
 ]

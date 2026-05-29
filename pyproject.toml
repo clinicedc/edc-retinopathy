@@ -5,12 +5,15 @@ description = "Retinopathy camera integration for clinicedc"
 readme = "README.rst"
 requires-python = ">=3.12,<3.15"
 dependencies = [
+    "clinicedc>=3.1.5",
     "django>=5.2,<6.1",
     "djangorestframework>=3.16.0",
+    "watchdog>=6.0.0",
 ]
 
 [dependency-groups]
 dev = [
+    "clinicedc-tests>=1.2.2",
     "sphinx>=9.1.0",
 ]
 
@@ -20,3 +23,9 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/edc_retinopathy"]
+
+[tool.uv.sources]
+clinicedc = { path = "../clinicedc", editable = true }
+clinicedc-constants = { path = "../clinicedc-constants", editable = true }
+clinicedc-tests = { path = "../clinicedc-tests", editable = true }
+clinicedc-utils = { path = "../clinicedc-utils", editable = true }

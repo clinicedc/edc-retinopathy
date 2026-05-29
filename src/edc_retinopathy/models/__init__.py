@@ -1,7 +1,9 @@
-from .retinal_image import RetinalImage
-from .retinopathy_session import RetinopathySession
+from .camera_session import CameraSession
+from .registered_subject_proxy import RegisteredSubjectProxy
+from .session_file import SessionFile
 
 __all__ = [
-    "RetinalImage",
-    "RetinopathySession",
+    "SessionFile",
+    "CameraSession",
+    "RegisteredSubjectProxy",
 ]
