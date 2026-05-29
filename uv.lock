@@ -569,7 +569,7 @@ wheels = [
 [[package]]
 name = "clinicedc"
 version = "3.1.5"
-source = { registry = "https://pypi.org/simple" }
+source = { editable = "../clinicedc" }
 dependencies = [
     { name = "argon2-cffi" },
     { name = "arrow" },
@@ -602,6 +602,7 @@ dependencies = [
     { name = "inflect" },
     { name = "mempass" },
     { name = "mysqlclient" },
+    { name = "parse-trial-labs" },
     { name = "psycopg2" },
     { name = "pycups" },
     { name = "pypdf" },
@@ -614,24 +615,90 @@ dependencies = [
     { name = "tqdm" },
     { name = "twilio" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/71/a3/2b7daf8f0a705056ad3180171b2f209049d309417be20139bb9238149eaa/clinicedc-3.1.5.tar.gz", hash = "sha256:8751516a9037ebf12a27504f3d26e02160336f367064c37d0de0c58ca378b7ce", size = 1290727, upload-time = "2026-04-22T21:38:32.543Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/39/45/3522876747533f975ba4bb452dc416447358f22f73f736563e4f42ce2a0a/clinicedc-3.1.5-py3-none-any.whl", hash = "sha256:207b5088a266f75cc9f5f2574ab5f6b8eaef90f323721d51e8d5ab4d972338e5", size = 2668270, upload-time = "2026-04-22T21:38:30.27Z" },
+
+[package.metadata]
+requires-dist = [
+    { name = "argon2-cffi", specifier = ">=25.1.0" },
+    { name = "arrow", specifier = ">=1.3.0" },
+    { name = "beautifulsoup4", specifier = ">=4.13.5" },
+    { name = "boto3", specifier = ">=1.39.16" },
+    { name = "celery", specifier = ">=5.5.3" },
+    { name = "clinicedc-constants", editable = "../clinicedc-constants" },
+    { name = "clinicedc-utils", editable = "../clinicedc-utils" },
+    { name = "cryptography", specifier = ">=45.0.7" },
+    { name = "django", specifier = ">=5.2,<6.1" },
+    { name = "django-admin-rangefilter", specifier = ">=0.13.3" },
+    { name = "django-audit-fields", specifier = ">=2.0.6" },
+    { name = "django-crypto-fields", specifier = ">=1.2.0" },
+    { name = "django-db-views", specifier = ">=0.1.11" },
+    { name = "django-defender", specifier = ">=0.9.8" },
+    { name = "django-environ", specifier = ">=0.12.0" },
+    { name = "django-import-export", specifier = ">=4.3.0" },
+    { name = "django-logentry-admin", specifier = ">=1.1.0" },
+    { name = "django-multisite2", specifier = ">=2.1.0" },
+    { name = "django-pandas", specifier = ">=0.6.7" },
+    { name = "django-pylabels", specifier = ">=1.0.1" },
+    { name = "django-redis", specifier = ">=6.0.0" },
+    { name = "django-revision", specifier = ">=2.1.0" },
+    { name = "django-sequences", specifier = ">=3.0" },
+    { name = "django-simple-history", specifier = ">=3.10.1" },
+    { name = "django-storages", specifier = ">=1.14.6" },
+    { name = "djangorestframework", specifier = ">=3.16.0" },
+    { name = "fontawesomefree", specifier = ">=6.6.0" },
+    { name = "gunicorn", specifier = ">=23.0.0" },
+    { name = "inflect", specifier = ">=7.5.0" },
+    { name = "mempass", specifier = ">=0.1.2" },
+    { name = "mysqlclient", specifier = ">=2.2.7" },
+    { name = "parse-trial-labs", specifier = ">=0.4.0" },
+    { name = "psycopg2", specifier = ">=2.9.10" },
+    { name = "pycups", specifier = ">=2.0.4" },
+    { name = "pypdf", specifier = ">=5.9.0" },
+    { name = "python-dateutil", specifier = ">=2.9.0.post0" },
+    { name = "python-memcached", specifier = ">=1.62" },
+    { name = "reportlab", specifier = ">=4.4.3" },
+    { name = "sqlalchemy", specifier = ">=2.0.42" },
+    { name = "sqlglot", specifier = ">=27.8.0" },
+    { name = "tabulate", specifier = ">=0.9.0" },
+    { name = "tqdm", specifier = ">=4.67.1" },
+    { name = "twilio", specifier = ">=9.7.0" },
+]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "clinicedc-tests", editable = "../clinicedc-tests" },
+    { name = "django-webtest", specifier = ">=1.9.14" },
+]
+docs = [
+    { name = "furo", specifier = ">=2025.7.19" },
+    { name = "sphinx", specifier = ">=8.2.3" },
+    { name = "sphinx-design", specifier = ">=0.6.1" },
+    { name = "sphinx-inline-tabs", specifier = ">=2023.4.21" },
+    { name = "sphinx-rtd-theme", specifier = ">=3.0.2" },
+]
+lint = [{ name = "ruff", specifier = ">=0.13.2" }]
+notebook = [
+    { name = "dj-notebook", specifier = ">=0.7.0" },
+    { name = "great-tables", specifier = ">=0.18.0" },
+    { name = "matplotlib", specifier = ">=3.10.3" },
+    { name = "matplotlib-venn", specifier = ">=1.1.2" },
+    { name = "numpy", specifier = ">=2.3.2" },
+    { name = "pandas", specifier = ">=2.3.1" },
+    { name = "pdfkit", specifier = ">=1.0.0" },
+    { name = "scikit-learn", specifier = ">=1.7.1" },
+    { name = "scipy", specifier = ">=1.16.0" },
+    { name = "selenium", specifier = ">=4.34.2" },
+    { name = "tabulate", specifier = ">=0.9.0" },
 ]
 
 [[package]]
 name = "clinicedc-constants"
 version = "1.5.0"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/25/17/2a738f89ba1f81cf78007dcf52af975fdc125374d555c1643d8526a52fc8/clinicedc_constants-1.5.0.tar.gz", hash = "sha256:31bb3d93aa61ec610a3d76a37e6ce6f35a937ecae2f74daf56a0e9d0aeaa8b8c", size = 11378, upload-time = "2026-05-21T02:06:42.755Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/42/3b/575d2f5c7a938b49c037575f4971a22cbaf2bf7878d5d384b6870bc73fa6/clinicedc_constants-1.5.0-py3-none-any.whl", hash = "sha256:c43f21bdedcfc7b97d97438e6bbdd8d990e71c07b23fd83355db332a0fc5ca22", size = 13538, upload-time = "2026-05-21T02:06:41.337Z" },
-]
+source = { editable = "../clinicedc-constants" }
 
 [[package]]
 name = "clinicedc-tests"
 version = "1.2.2"
-source = { registry = "https://pypi.org/simple" }
+source = { editable = "../clinicedc-tests" }
 dependencies = [
     { name = "coverage" },
     { name = "django-mock-queries" },
@@ -641,15 +708,32 @@ dependencies = [
     { name = "tox" },
     { name = "tox-uv" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/9d/92/f3d98fcbdf71a971a3a5820564196aa1e532234111f110d1628400e566d9/clinicedc_tests-1.2.2.tar.gz", hash = "sha256:777c3fb5654a23064736f1e65f3d039ca3eb6937bf177463cc5c923d7eeee89f", size = 55708, upload-time = "2026-04-19T20:55:44.039Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/21/7b/78e305c6de030c45002389877212618b3ded8410104db5f23c26eb1c1979/clinicedc_tests-1.2.2-py3-none-any.whl", hash = "sha256:e1c9e6d059af22d9ab7784a648084b416b5e5a5bb78b32eec5d05e0b8f1954f7", size = 98118, upload-time = "2026-04-19T20:55:42.74Z" },
+
+[package.metadata]
+requires-dist = [
+    { name = "coverage", specifier = ">=7.13.5" },
+    { name = "django-mock-queries", specifier = ">=2.3.0" },
+    { name = "faker", specifier = ">=37.4.2" },
+    { name = "model-bakery", specifier = ">=1.20.5" },
+    { name = "time-machine", specifier = ">=2.16.0" },
+    { name = "tox", specifier = ">=4.32.0" },
+    { name = "tox-uv", specifier = ">=1.26.2" },
 ]
+
+[package.metadata.requires-dev]
+dev = []
+docs = [
+    { name = "furo", specifier = ">=2025.7.19" },
+    { name = "sphinx", specifier = ">=8.2.3" },
+    { name = "sphinx-design", specifier = ">=0.6.1" },
+    { name = "sphinx-inline-tabs", specifier = ">=2023.4.21" },
+]
+lint = [{ name = "ruff", specifier = ">=0.12.5" }]
 
 [[package]]
 name = "clinicedc-utils"
 version = "1.0.3"
-source = { registry = "https://pypi.org/simple" }
+source = { editable = "../clinicedc-utils" }
 dependencies = [
     { name = "clinicedc-constants" },
     { name = "pandas" },
@@ -657,9 +741,14 @@ dependencies = [
     { name = "sqlalchemy" },
     { name = "tqdm" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/c5/ff/aa341d601f50e22bcc0eb8d11613fa0a6f59e3d847f44cedf7114bcf5427/clinicedc_utils-1.0.3.tar.gz", hash = "sha256:93abdb84fe996b5c7c07297a71ab677604c4d914b219784d45b9a93ec753ef8a", size = 8904, upload-time = "2026-05-21T02:08:12.043Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/3f/e0/90de15f09b5d32e34d9390cdb06ae2d559d52e1a763a1b9b764c7b3c9b70/clinicedc_utils-1.0.3-py3-none-any.whl", hash = "sha256:841fe7238a4c2e073cc982e49b150695a4049b263003f16d812538d006d9181c", size = 20541, upload-time = "2026-05-21T02:08:13.073Z" },
+
+[package.metadata]
+requires-dist = [
+    { name = "clinicedc-constants", specifier = ">=1.0.1" },
+    { name = "pandas", specifier = ">=2.3.3" },
+    { name = "remote-read-sql", specifier = ">=1.2.3" },
+    { name = "sqlalchemy", specifier = ">=2.0.44" },
+    { name = "tqdm", specifier = ">=4.67.1" },
 ]
 
 [[package]]
@@ -1089,7 +1178,7 @@ wheels = [
 
 [[package]]
 name = "edc-retinopathy"
-version = "0.1.1"
+version = "0.2.0"
 source = { editable = "." }
 dependencies = [
     { name = "clinicedc" },
@@ -1106,7 +1195,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "clinicedc", specifier = ">=3.1.5" },
+    { name = "clinicedc", editable = "../clinicedc" },
     { name = "django", specifier = ">=5.2,<6.1" },
     { name = "djangorestframework", specifier = ">=3.16.0" },
     { name = "watchdog", specifier = ">=6.0.0" },
@@ -1114,7 +1203,7 @@ requires-dist = [
 
 [package.metadata.requires-dev]
 dev = [
-    { name = "clinicedc-tests", specifier = ">=1.2.2" },
+    { name = "clinicedc-tests", editable = "../clinicedc-tests" },
     { name = "sphinx", specifier = ">=9.1.0" },
 ]
 
@@ -1722,6 +1811,47 @@ wheels = [
 ]
 
 [[package]]
+name = "parse-trial-labs"
+version = "0.4.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "pandas" },
+    { name = "pdfplumber" },
+    { name = "tqdm" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/43/0f/9e487271216d180d648b3886bf460c112a5d6c57b8afa0e7a5ed232fa86f/parse_trial_labs-0.4.0.tar.gz", hash = "sha256:2bf5c10430408e682851e9eb4cd59c904af0ed75eadff4fd42ca00d07fd0d6fa", size = 17460, upload-time = "2026-05-18T17:19:59.889Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/97/f3/aa59807418466a3331f22ccbe46c8b4c934c477904043a2e15111e76c900/parse_trial_labs-0.4.0-py3-none-any.whl", hash = "sha256:740d726b0eabe477fc9fa93a167a7670044c95a2b72079563752229e4bef5401", size = 19636, upload-time = "2026-05-18T17:19:58.739Z" },
+]
+
+[[package]]
+name = "pdfminer-six"
+version = "20251230"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "charset-normalizer" },
+    { name = "cryptography" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/46/9a/d79d8fa6d47a0338846bb558b39b9963b8eb2dfedec61867c138c1b17eeb/pdfminer_six-20251230.tar.gz", hash = "sha256:e8f68a14c57e00c2d7276d26519ea64be1b48f91db1cdc776faa80528ca06c1e", size = 8511285, upload-time = "2025-12-30T15:49:13.104Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/65/d7/b288ea32deb752a09aab73c75e1e7572ab2a2b56c3124a5d1eb24c62ceb3/pdfminer_six-20251230-py3-none-any.whl", hash = "sha256:9ff2e3466a7dfc6de6fd779478850b6b7c2d9e9405aa2a5869376a822771f485", size = 6591909, upload-time = "2025-12-30T15:49:10.76Z" },
+]
+
+[[package]]
+name = "pdfplumber"
+version = "0.11.9"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "pdfminer-six" },
+    { name = "pillow" },
+    { name = "pypdfium2" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/38/37/9ca3519e92a8434eb93be570b131476cc0a4e840bb39c62ddb7813a39d53/pdfplumber-0.11.9.tar.gz", hash = "sha256:481224b678b2bbdbf376e2c39bf914144eef7c3d301b4a28eebf0f7f6109d6dc", size = 102768, upload-time = "2026-01-05T08:10:29.072Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/8b/c8/cdbc975f5b634e249cfa6597e37c50f3078412474f21c015e508bfbfe3c3/pdfplumber-0.11.9-py3-none-any.whl", hash = "sha256:33ec5580959ba524e9100138746e090879504c42955df1b8a997604dd326c443", size = 60045, upload-time = "2026-01-05T08:10:27.512Z" },
+]
+
+[[package]]
 name = "pillow"
 version = "12.2.0"
 source = { registry = "https://pypi.org/simple" }
@@ -2042,6 +2172,35 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/0a/6d/20879428577c1e57ecd41b69dc86beabf43db9287ad2e702207f8b48c751/pypdf-6.12.2.tar.gz", hash = "sha256:111669eb6680c04495ae0c113a1476e3bf93a95761d23c7406b591c80a6490b1", size = 6468184, upload-time = "2026-05-26T13:31:26.911Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/9e/44/fee070a16639d9869bb6a7e0f3a1b3946da1d66f32b9260b4d19cb90d7b2/pypdf-6.12.2-py3-none-any.whl", hash = "sha256:67b2699357a1f3f4c945940ea80826349ee507c9e2577724a14b4941982c104d", size = 343865, upload-time = "2026-05-26T13:31:25.068Z" },
+]
+
+[[package]]
+name = "pypdfium2"
+version = "5.8.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/6d/3d/dc934d3b606c51c3ecc95b6731d84b7dd7ab8e513a50b0e98a4da6c8a719/pypdfium2-5.8.0.tar.gz", hash = "sha256:049397c647e50f83115ee951c49394dab9e9ba52ebdd5a11ab1109390eb3d34e", size = 271934, upload-time = "2026-05-04T17:39:43.794Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/6f/8c/6b75b923cb81368fa3ea7c48a0616b839620a3aeff899885bd930449b89e/pypdfium2-5.8.0-py3-none-android_23_arm64_v8a.whl", hash = "sha256:f67b6c74b716d9ac725ad1af49ae786ad813ac20823d45606d59f1fc06caa8af", size = 3374554, upload-time = "2026-05-04T17:39:05.552Z" },
+    { url = "https://files.pythonhosted.org/packages/ef/61/a885c7f36efba89ec98e3d1fe95c83b48c2d6dea321e9194ac6460e7a834/pypdfium2-5.8.0-py3-none-android_23_armeabi_v7a.whl", hash = "sha256:53e82bf3e6a2da170b1bda83f93b7eec57cb6efe3cacd05cba78823879a85203", size = 2831667, upload-time = "2026-05-04T17:39:08.028Z" },
+    { url = "https://files.pythonhosted.org/packages/86/1f/04b5627f6dba312d3e707e5b019c9f24d8b03b5aa366866a9e02ec00f8d4/pypdfium2-5.8.0-py3-none-macosx_11_0_arm64.whl", hash = "sha256:085e633dcc89b65ff4035a4787e98ce7ae636836eb39c83dd0db26113d9774bc", size = 3450815, upload-time = "2026-05-04T17:39:09.551Z" },
+    { url = "https://files.pythonhosted.org/packages/a9/77/8e3a2aba2bc4aef5abe1b1306d05b00588dc0bf7f5c850d1adf6164c786b/pypdfium2-5.8.0-py3-none-macosx_11_0_x86_64.whl", hash = "sha256:bc84b7c6efede88fcfb9467f81daf416f26b973a54fc1cf4d3410d622fda6d7a", size = 3634395, upload-time = "2026-05-04T17:39:11.225Z" },
+    { url = "https://files.pythonhosted.org/packages/93/11/6f2b1847d9fa457b3b7251afc2bba2706d104a0c6f01431dfae5d679a839/pypdfium2-5.8.0-py3-none-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:a63bf09b2e13ba8545c930d243f0650c664a1b51314daa3b5f38df6d1a17b4bc", size = 3617413, upload-time = "2026-05-04T17:39:13.139Z" },
+    { url = "https://files.pythonhosted.org/packages/ed/fd/99ce639de5ca06d21743c740dd988cd209dda623bc763ae10b8a162022e1/pypdfium2-5.8.0-py3-none-manylinux_2_17_armv7l.manylinux2014_armv7l.whl", hash = "sha256:937881c1698456749ed203a58db1895baa5eb7178cdb837ef84867790638da28", size = 3347639, upload-time = "2026-05-04T17:39:15.086Z" },
+    { url = "https://files.pythonhosted.org/packages/fa/47/82864cc6e26dd8969d5594c168635acb16458d35cf5fed65d6b2e32abb42/pypdfium2-5.8.0-py3-none-manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:6be9dc2b84a8694ad7e626bab133244e8241014d5ed1930d865a9bdf90df1e24", size = 3746404, upload-time = "2026-05-04T17:39:17.094Z" },
+    { url = "https://files.pythonhosted.org/packages/82/58/e41e49bba951f61921bac7289e67fe02af5ac57192d0bbfb5f459dc3691d/pypdfium2-5.8.0-py3-none-manylinux_2_17_ppc64le.manylinux2014_ppc64le.whl", hash = "sha256:7f27bd82891ae302dd02d736b14809661f6d1220ee1e96dbed9b23e2811922a3", size = 4177893, upload-time = "2026-05-04T17:39:18.729Z" },
+    { url = "https://files.pythonhosted.org/packages/b4/15/fa7031010d5cf6853dadb4864680a0bfb7782c5bb6a1a401e0c25c4fca87/pypdfium2-5.8.0-py3-none-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:26c1089cdbbdc7fe1248f6d17fe3f30214be4f287dd0196b31aaee18a1564240", size = 3665152, upload-time = "2026-05-04T17:39:20.207Z" },
+    { url = "https://files.pythonhosted.org/packages/de/6a/5a3520a8b0cfa8d7fdc3f03a07ad9d6146c28ffd519330706f64fd8939a8/pypdfium2-5.8.0-py3-none-manylinux_2_27_s390x.manylinux_2_28_s390x.whl", hash = "sha256:1c038a9290864aaa4862dd32e591993d82551ca4d152b4e8ce6d43ba37dc04a8", size = 3095365, upload-time = "2026-05-04T17:39:22.054Z" },
+    { url = "https://files.pythonhosted.org/packages/32/d3/845bae4de3cfa36865959046156edb5bf9baea400ccdecdd84fdd911b0f5/pypdfium2-5.8.0-py3-none-manylinux_2_38_riscv64.manylinux_2_39_riscv64.whl", hash = "sha256:f104bc1a6d8bfc1ff088aa50db13b9729cfdb3722b44975c3c457e9a7b9c7318", size = 2961801, upload-time = "2026-05-04T17:39:23.817Z" },
+    { url = "https://files.pythonhosted.org/packages/99/76/cf54eabee4a172241dfcfe63533bd1e11e2162114a983453a5a40bfec114/pypdfium2-5.8.0-py3-none-musllinux_1_2_aarch64.whl", hash = "sha256:04ca7c57a553facf8d46c6ea8ba6fa557e698670cfa4a58e0e01fdae2f6be87d", size = 4133067, upload-time = "2026-05-04T17:39:25.619Z" },
+    { url = "https://files.pythonhosted.org/packages/77/66/dcf871d19187ca04ea184a99801a6e7e556d8347aa49540fee33cda6dfc5/pypdfium2-5.8.0-py3-none-musllinux_1_2_armv7l.whl", hash = "sha256:ad42b9c22477b32dbedcbc8232833f385d92fd0cf92822547b02383cf9a476d7", size = 3749100, upload-time = "2026-05-04T17:39:27.203Z" },
+    { url = "https://files.pythonhosted.org/packages/32/67/0d456c79660959ca45ad307b4d67161d29f9ed4083ee1e8fe8c6925b7c82/pypdfium2-5.8.0-py3-none-musllinux_1_2_i686.whl", hash = "sha256:388e3119cf5ca0979b7d5f6d40b7fcd5ab49e17ed4e6de6af89ba116061acfda", size = 4339212, upload-time = "2026-05-04T17:39:29.277Z" },
+    { url = "https://files.pythonhosted.org/packages/76/89/e5b0e0f7936be341c91c0f45cd70d693878894ed62aed93a6ee32e9c43c4/pypdfium2-5.8.0-py3-none-musllinux_1_2_ppc64le.whl", hash = "sha256:aa05bbfa485ce7916217aa78d856c9f9cd86b08b20846c650392a67975ee72e9", size = 4383943, upload-time = "2026-05-04T17:39:31.287Z" },
+    { url = "https://files.pythonhosted.org/packages/82/21/4502ed255f082f579cd3537c2971cf1a57778d43703a08bcd1a92253189f/pypdfium2-5.8.0-py3-none-musllinux_1_2_riscv64.whl", hash = "sha256:f0813a16bb39d5ebd173ea5484430bb67a89b4b181db0a636c73b64ad063c3ea", size = 3925680, upload-time = "2026-05-04T17:39:33.241Z" },
+    { url = "https://files.pythonhosted.org/packages/7d/4f/2e59723e7a07779439bd885c1b4960079c9710603308888d29ac926ae69a/pypdfium2-5.8.0-py3-none-musllinux_1_2_s390x.whl", hash = "sha256:a3c78f7d20dd821bec6c072efdb21a1370b9efe10fdeeb68c969e67608e25385", size = 4269560, upload-time = "2026-05-04T17:39:34.926Z" },
+    { url = "https://files.pythonhosted.org/packages/34/4e/7b6b1bde3788c8b880d4b8131d95d9d339cebafb3ad9102d82e234bb65be/pypdfium2-5.8.0-py3-none-musllinux_1_2_x86_64.whl", hash = "sha256:86d302e207c138c827b885a72784f7b306d840646ebeae07e8efdbc39321c629", size = 4182434, upload-time = "2026-05-04T17:39:36.624Z" },
+    { url = "https://files.pythonhosted.org/packages/11/7b/6ed4782e0d7a5278330598ce8c4b2df7255f4585a0b3d04520fa580d6507/pypdfium2-5.8.0-py3-none-win32.whl", hash = "sha256:3f25fd436920a907291462b41bdc0ab9f8235c3944b4c9c15398da595ffd1fed", size = 3636680, upload-time = "2026-05-04T17:39:38.49Z" },
+    { url = "https://files.pythonhosted.org/packages/19/55/da7223d4202b2461f4f889b0baf10dddec3db7f88e6fd8c52db4a516eecd/pypdfium2-5.8.0-py3-none-win_amd64.whl", hash = "sha256:55592af0bddd2d62bed18e0053c546c9b72041430c5115e54870f7f6163125b0", size = 3754962, upload-time = "2026-05-04T17:39:40.13Z" },
+    { url = "https://files.pythonhosted.org/packages/fc/7a/f3dcefe6ee7389aad3ca1488c177e8fbf978206de21c7a99ccf487ea38ab/pypdfium2-5.8.0-py3-none-win_arm64.whl", hash = "sha256:3f17ed97ae8a5a1705301ca93af256a5b02f9009dee4e99c5e175831d46ebd7c", size = 3548362, upload-time = "2026-05-04T17:39:42.304Z" },
 ]
 
 [[package]]
