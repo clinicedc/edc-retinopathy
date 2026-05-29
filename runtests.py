@@ -1,24 +1,5 @@
 #!/usr/bin/env python
-"""Run tests for edc-retinopathy."""
-
-import os
-import sys
-
-import django
-from django.conf import settings
-from django.test.utils import get_runner
-
-
-def main() -> None:
-    os.environ.setdefault(
-        "DJANGO_SETTINGS_MODULE", "edc_retinopathy.tests.settings"
-    )
-    django.setup()
-    TestRunner = get_runner(settings)
-    test_runner = TestRunner()
-    failures = test_runner.run_tests(["edc_retinopathy.tests"])
-    sys.exit(bool(failures))
-
+from clinicedc_tests.config import func_main
 
 if __name__ == "__main__":
-    main()
+    func_main("tests.test_settings", "tests")

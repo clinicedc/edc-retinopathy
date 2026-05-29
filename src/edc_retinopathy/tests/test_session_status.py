@@ -10,7 +10,7 @@ from django.utils import timezone
 from rest_framework.authtoken.models import Token
 from rest_framework.test import APIClient
 
-from ..models import RetinalImage, RetinopathySession
+from ..models import CameraSession, SessionFile
 from .models import RegisteredSubject
 
 
@@ -38,7 +38,7 @@ class SessionStatusTests(TestCase):
 
     def test_status_empty_session(self) -> None:
         """Returns session with no uploads."""
-        session = RetinopathySession.objects.create(
+        session = CameraSession.objects.create(
             subject_identifier="105-10-0001-2",
             initials="JD",
             sex="M",
@@ -48,18 +48,19 @@ class SessionStatusTests(TestCase):
         self.assertEqual(response.data["session_id"], session.pk)
         self.assertEqual(response.data["uploaded"], [])
         self.assertEqual(
-            sorted(response.data["missing"]), ["left", "report", "right"]
+            sorted(response.data["missing"]),
+            ["left", "left_report", "right", "right_report"],
         )
         self.assertFalse(response.data["complete"])
 
     def test_status_partial_uploads(self) -> None:
         """Returns correct uploaded/missing after partial uploads."""
-        session = RetinopathySession.objects.create(
+        session = CameraSession.objects.create(
             subject_identifier="105-10-0001-2",
             initials="JD",
             sex="M",
         )
-        RetinalImage.objects.create(
+        SessionFile.objects.create(
             session=session,
             file_type="left",
             original_filename="left.jpg",
@@ -71,13 +72,14 @@ class SessionStatusTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data["uploaded"], ["left"])
         self.assertEqual(
-            sorted(response.data["missing"]), ["report", "right"]
+            sorted(response.data["missing"]),
+            ["left_report", "right", "right_report"],
         )
         self.assertFalse(response.data["complete"])
 
     def test_status_complete_session(self) -> None:
-        """Returns complete=True when all three files uploaded."""
-        session = RetinopathySession.objects.create(
+        """Returns complete=True when all four file types uploaded."""
+        session = CameraSession.objects.create(
             subject_identifier="105-10-0001-2",
             initials="JD",
             sex="M",
@@ -85,9 +87,10 @@ class SessionStatusTests(TestCase):
         for ft, fn in [
             ("left", "l.jpg"),
             ("right", "r.jpg"),
-            ("report", "rpt.pdf"),
+            ("left_report", "l_report.html"),
+            ("right_report", "r_report.html"),
         ]:
-            RetinalImage.objects.create(
+            SessionFile.objects.create(
                 session=session,
                 file_type=ft,
                 original_filename=fn,
@@ -98,19 +101,20 @@ class SessionStatusTests(TestCase):
         response = self.client.get(self.url)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(
-            sorted(response.data["uploaded"]), ["left", "report", "right"]
+            sorted(response.data["uploaded"]),
+            ["left", "left_report", "right", "right_report"],
         )
         self.assertEqual(response.data["missing"], [])
         self.assertTrue(response.data["complete"])
 
     def test_status_uses_most_recent_session(self) -> None:
         """Returns the most recent session, not an older one."""
-        older = RetinopathySession.objects.create(
+        older = CameraSession.objects.create(
             subject_identifier="105-10-0001-2",
             initials="JD",
             sex="M",
         )
-        RetinalImage.objects.create(
+        SessionFile.objects.create(
             session=older,
             file_type="left",
             original_filename="l.jpg",
@@ -118,7 +122,7 @@ class SessionStatusTests(TestCase):
             file_size=1024,
             capture_datetime=timezone.now(),
         )
-        newer = RetinopathySession.objects.create(
+        newer = CameraSession.objects.create(
             subject_identifier="105-10-0001-2",
             initials="JD",
             sex="M",
@@ -135,7 +139,7 @@ class SessionStatusTests(TestCase):
 
     def test_status_includes_created_datetime(self) -> None:
         """Response includes created_datetime as ISO string."""
-        RetinopathySession.objects.create(
+        CameraSession.objects.create(
             subject_identifier="105-10-0001-2",
             initials="JD",
             sex="M",

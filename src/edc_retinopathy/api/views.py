@@ -5,7 +5,7 @@ import logging
 import os
 import tempfile
 import uuid
-from datetime import date, timedelta
+from datetime import timedelta
 from pathlib import Path
 
 from django.conf import settings
@@ -18,7 +18,7 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from ..models import RetinalImage, RetinopathySession
+from ..models import CameraSession, SessionFile
 from .serializers import FileUploadSerializer, ResolveSubjectSerializer
 
 logger = logging.getLogger(__name__)
@@ -26,15 +26,23 @@ logger = logging.getLogger(__name__)
 # Magic bytes for basic content validation
 _JPEG_MAGIC = b"\xff\xd8\xff"
 _PDF_MAGIC = b"%PDF"
+_HTML_MARKERS = (b"<!doctype", b"<html", b"<head", b"<body")
+
+_VALID_FILE_TYPES = frozenset(
+    {"left", "right", "report", "left_report", "right_report"}
+)
+_REPORT_FILE_TYPES = frozenset({"report", "left_report", "right_report"})
+_IMAGE_FILE_TYPES = frozenset({"left", "right"})
 
 # Default settings
 _DEFAULT_MAX_FILE_SIZE_MB = 10
 _DEFAULT_SESSION_EXPIRE_MINUTES = 120
-_DEFAULT_SESSION_REACTIVATION_HOURS = 24
 
 
 def _get_max_file_size_bytes() -> int:
-    mb = getattr(settings, "EDC_RETINOPATHY_MAX_FILE_SIZE_MB", _DEFAULT_MAX_FILE_SIZE_MB)
+    mb = getattr(
+        settings, "EDC_RETINOPATHY_MAX_FILE_SIZE_MB", _DEFAULT_MAX_FILE_SIZE_MB
+    )
     return int(mb * 1024 * 1024)
 
 
@@ -48,92 +56,62 @@ def _get_session_expire_minutes() -> int:
     )
 
 
-def _get_session_reactivation_hours() -> int:
-    return int(
-        getattr(
-            settings,
-            "EDC_RETINOPATHY_SESSION_REACTIVATION_HOURS",
-            _DEFAULT_SESSION_REACTIVATION_HOURS,
-        )
-    )
-
-
 def _get_storage_dir() -> Path:
     base = Path(settings.EDC_RETINOPATHY_STORAGE_DIR).expanduser()
     return base / "images"
 
 
-def _get_registered_subject_model():
-    from django.apps import apps
-
-    return apps.get_model(settings.EDC_REGISTRATION_REGISTERED_SUBJECT_MODEL)
-
-
-def _validate_subject(
-    subject_identifier: str,
+def _validate_subject_against_session(
+    session: CameraSession,
     initials: str,
     sex: str,
     age: int | None,
 ) -> dict:
-    """Validate subject against RegisteredSubject.
+    """Validate demographics from the camera against a CameraSession.
+
+    The CameraSession is populated from RegisteredSubject when it is
+    saved, so this cross-checks the camera's local DB against the EDC.
 
     Returns a dict with 'valid' (bool), 'code' (str), and
     'errors' (list of str).
     """
-    RegisteredSubject = _get_registered_subject_model()
     errors: list[str] = []
-    try:
-        rs = RegisteredSubject.objects.get(
-            subject_identifier=subject_identifier,
-        )
-    except RegisteredSubject.DoesNotExist:
-        return {
-            "valid": False,
-            "code": "subject_not_found",
-            "errors": ["Subject identifier not found."],
-        }
 
-    if rs.initials and rs.initials.upper() != initials.upper():
+    if session.initials and session.initials.upper() != initials.upper():
         errors.append(
-            f"Initials mismatch: expected '{rs.initials}', got '{initials}'."
+            f"Initials mismatch: expected '{session.initials}', got '{initials}'."
         )
-    if rs.gender and rs.gender.upper() != sex.upper():
+    if session.gender and session.gender.upper() != sex.upper():
         errors.append(
-            f"Sex mismatch: expected '{rs.gender}', got '{sex}'."
+            f"Sex mismatch: expected '{session.gender}', got '{sex}'."
         )
-    if age is not None and rs.dob:
-        today = date.today()
-        expected_age = (
-            today.year
-            - rs.dob.year
-            - ((today.month, today.day) < (rs.dob.month, rs.dob.day))
-        )
-        if abs(expected_age - age) > 1:
+    if age is not None and session.age_in_years is not None:
+        if abs(session.age_in_years - age) > 1:
             errors.append(
-                f"Age mismatch: expected ~{expected_age}, got {age}."
+                f"Age mismatch: expected ~{session.age_in_years}, got {age}."
             )
     if errors:
         return {"valid": False, "code": "validation_mismatch", "errors": errors}
     return {"valid": True, "code": "ok", "errors": []}
 
 
-def _validate_file_content(
-    uploaded_file, file_type: str
-) -> str | None:
+def _validate_file_content(uploaded_file, file_type: str) -> str | None:
     """Basic magic-byte validation. Returns error message or None."""
-    head = uploaded_file.read(8)
+    head = uploaded_file.read(256)
     uploaded_file.seek(0)
     if not head:
         return "Uploaded file is empty."
-    if file_type == "report":
-        if not head.startswith(_PDF_MAGIC):
-            return "Report file does not appear to be a valid PDF."
+    if file_type in _REPORT_FILE_TYPES:
+        # Accept PDF or HTML for report types
+        stripped = head.lstrip(b"\xef\xbb\xbf \t\n\r")
+        is_pdf = stripped.startswith(_PDF_MAGIC)
+        is_html = any(stripped.lower().startswith(m) for m in _HTML_MARKERS)
+        if not (is_pdf or is_html):
+            return "Report file does not appear to be a valid PDF or HTML."
     else:
         # Accept JPEG and PNG for eye images
         if not (head.startswith(_JPEG_MAGIC) or head.startswith(b"\x89PNG")):
-            return (
-                "Image file does not appear to be a valid JPEG or PNG."
-            )
+            return "Image file does not appear to be a valid JPEG or PNG."
     return None
 
 
@@ -146,22 +124,22 @@ def _compute_sha256(file_path: str) -> str:
     return h.hexdigest()
 
 
-def _image_response_data(retinal_image: RetinalImage) -> dict:
-    """Build the standard response payload for a RetinalImage."""
+def _image_response_data(session_file: SessionFile) -> dict:
+    """Build the standard response payload for a SessionFile."""
     return {
-        "id": str(retinal_image.pk),
-        "session_id": retinal_image.session_id,
-        "file_type": retinal_image.file_type,
-        "original_filename": retinal_image.original_filename,
-        "stored_filename": retinal_image.stored_filename,
-        "checksum": retinal_image.checksum,
+        "id": str(session_file.pk),
+        "session_id": session_file.session_id,
+        "file_type": session_file.file_type,
+        "original_filename": session_file.original_filename,
+        "stored_filename": session_file.stored_filename,
+        "checksum": session_file.checksum,
     }
 
 
 def _find_session(
     subject_identifier: str,
     session_id: str | None = None,
-) -> RetinopathySession | None:
+) -> CameraSession | None:
     """Find an active session by subject_identifier.
 
     If session_id is provided, look up that specific session (no expiry
@@ -169,21 +147,18 @@ def _find_session(
     recent non-expired session.
     """
     if session_id is not None:
-        return (
-            RetinopathySession.objects.filter(
-                pk=session_id,
-                subject_identifier=subject_identifier,
-            )
-            .first()
-        )
+        return CameraSession.objects.filter(
+            pk=session_id,
+            subject_identifier=subject_identifier,
+        ).first()
     expire_minutes = _get_session_expire_minutes()
     cutoff = timezone.now() - timedelta(minutes=expire_minutes)
     return (
-        RetinopathySession.objects.filter(
+        CameraSession.objects.filter(
             subject_identifier=subject_identifier,
-            created_datetime__gte=cutoff,
+            report_datetime__gte=cutoff,
         )
-        .order_by("-created_datetime")
+        .order_by("-report_datetime")
         .first()
     )
 
@@ -213,13 +188,14 @@ class PingView(APIView):
 
 
 class ResolveSubjectView(APIView):
-    """Resolve and validate a subject identifier from the camera.
+    """Resolve a subject identifier against an existing CameraSession.
 
     POST /api/retinopathy/resolve/
 
-    If an incomplete session already exists for this subject (created
-    within the last 24 hours), it is reactivated instead of creating a
-    new one. This handles reconnection after an outage.
+    A CameraSession must be created in the EDC by the clinician before
+    the camera exam. This endpoint finds the most recent incomplete
+    session for the subject, validates demographics from the camera's
+    local DB, and returns the session_id for file uploads.
     """
 
     authentication_classes = [TokenAuthentication]
@@ -234,16 +210,73 @@ class ResolveSubjectView(APIView):
         subject_identifier = data["subject_identifier"]
         device_id = data.get("device_id", "")
 
-        result = _validate_subject(
+        # --- Find the most recent eligible session ---
+        # Walk sessions newest-first; skip contraindicated and complete.
+        sessions = CameraSession.objects.filter(
             subject_identifier=subject_identifier,
+        ).order_by("-report_datetime")
+
+        session = None
+        for candidate in sessions:
+            if candidate.contraindicated:
+                continue
+            if candidate.is_complete:
+                continue
+            session = candidate
+            break
+
+        if session is None:
+            # Distinguish "no sessions at all" from "all ineligible".
+            if not sessions.exists():
+                logger.warning(
+                    "No camera session for %s (device=%s). "
+                    "Create one in the EDC before the exam.",
+                    subject_identifier,
+                    device_id,
+                )
+                return Response(
+                    {
+                        "code": "no_session",
+                        "errors": [
+                            "No camera session found for this subject. "
+                            "Create one in the EDC before conducting "
+                            "the exam."
+                        ],
+                    },
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+            logger.warning(
+                "All sessions for %s are complete or "
+                "contraindicated (device=%s).",
+                subject_identifier,
+                device_id,
+            )
+            return Response(
+                {
+                    "code": "no_eligible_session",
+                    "errors": [
+                        "All sessions for this subject are complete or "
+                        "contraindicated. Create a new session in the "
+                        "EDC to upload again."
+                    ],
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        uploaded = set(session.files.values_list("file_type", flat=True))
+
+        # --- Validate demographics against session ---
+        result = _validate_subject_against_session(
+            session=session,
             initials=data["initials"],
             sex=data["sex"],
             age=data.get("age"),
         )
         if not result["valid"]:
             logger.warning(
-                "Resolve failed for %s (device=%s): %s",
+                "Resolve failed for %s session=%s (device=%s): %s",
                 subject_identifier,
+                session.pk,
                 device_id,
                 "; ".join(result["errors"]),
             )
@@ -252,64 +285,26 @@ class ResolveSubjectView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # --- Try to reactivate an incomplete session ---
-        reactivation_cutoff = timezone.now() - timedelta(
-            hours=_get_session_reactivation_hours()
-        )
-        existing_session = (
-            RetinopathySession.objects.filter(
-                subject_identifier=subject_identifier,
-                created_datetime__gte=reactivation_cutoff,
-            )
-            .order_by("-created_datetime")
-            .first()
-        )
-        if existing_session:
-            uploaded = set(
-                existing_session.files.values_list("file_type", flat=True)
-            )
-            if uploaded != {"left", "right", "report"}:
-                # Incomplete — reactivate it
-                logger.info(
-                    "Reactivating session %s for %s (device=%s, uploaded=%s)",
-                    existing_session.pk,
-                    subject_identifier,
-                    device_id,
-                    sorted(uploaded),
-                )
-                return Response(
-                    {
-                        "subject_identifier": existing_session.subject_identifier,
-                        "session_id": existing_session.pk,
-                        "reactivated": True,
-                    },
-                    status=status.HTTP_200_OK,
-                )
-
-        # --- Create new session ---
-        session = RetinopathySession.objects.create(
-            subject_identifier=subject_identifier,
-            initials=data["initials"],
-            sex=data["sex"],
-            age=data.get("age"),
-            device_id=device_id,
-            site_id=data.get("site_id", ""),
-        )
+        # --- Update device_id if the session doesn't have one ---
+        if device_id and not session.device_id:
+            session.device_id = device_id
+            session.save(update_fields=["device_id"])
 
         logger.info(
-            "Session %s created for %s (device=%s)",
+            "Resolved session %s for %s (device=%s, uploaded=%s)",
             session.pk,
             subject_identifier,
             device_id,
+            sorted(uploaded),
         )
 
         return Response(
             {
                 "subject_identifier": session.subject_identifier,
                 "session_id": session.pk,
-                "reactivated": False,
+                "reactivated": bool(uploaded),
             },
-            status=status.HTTP_201_CREATED,
+            status=status.HTTP_200_OK,
         )
 
 
@@ -329,10 +324,10 @@ class SessionStatusView(APIView):
         subject_identifier: str,
     ) -> Response:
         session = (
-            RetinopathySession.objects.filter(
+            CameraSession.objects.filter(
                 subject_identifier=subject_identifier,
             )
-            .order_by("-created_datetime")
+            .order_by("-report_datetime")
             .first()
         )
         if not session:
@@ -344,19 +339,17 @@ class SessionStatusView(APIView):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
-        uploaded = list(
-            session.files.values_list("file_type", flat=True)
-        )
-        complete = set(uploaded) == {"left", "right", "report"}
+        uploaded = set(session.files.values_list("file_type", flat=True))
+        expected = session.expected_file_types
 
         return Response(
             {
                 "session_id": session.pk,
                 "subject_identifier": session.subject_identifier,
-                "created_datetime": session.created_datetime.isoformat(),
+                "report_datetime": session.report_datetime.isoformat(),
                 "uploaded": sorted(uploaded),
-                "missing": sorted({"left", "right", "report"} - set(uploaded)),
-                "complete": complete,
+                "missing": sorted(expected - uploaded),
+                "complete": session.is_complete,
             },
             status=status.HTTP_200_OK,
         )
@@ -387,7 +380,7 @@ class FileUploadView(APIView):
         subject_identifier: str,
         file_type: str,
     ) -> Response:
-        if file_type not in ("left", "right", "report"):
+        if file_type not in _VALID_FILE_TYPES:
             return Response(
                 {
                     "code": "invalid_file_type",
@@ -449,13 +442,10 @@ class FileUploadView(APIView):
             error_msg = "No active session found. Call resolve first."
             if session_id:
                 error_msg = (
-                    f"Session {session_id} not found for "
-                    f"subject {subject_identifier}."
+                    f"Session {session_id} not found for subject {subject_identifier}."
                 )
             else:
-                error_msg += (
-                    f" Sessions expire after {expire_minutes} minutes."
-                )
+                error_msg += f" Sessions expire after {expire_minutes} minutes."
             return Response(
                 {"code": "no_session", "error": error_msg},
                 status=status.HTTP_404_NOT_FOUND,
@@ -470,9 +460,7 @@ class FileUploadView(APIView):
 
         dest.parent.mkdir(parents=True, exist_ok=True)
 
-        fd, tmp_path = tempfile.mkstemp(
-            dir=str(dest.parent), suffix=f".tmp{ext}"
-        )
+        fd, tmp_path = tempfile.mkstemp(dir=str(dest.parent), suffix=f".tmp{ext}")
         try:
             with os.fdopen(fd, "wb") as out:
                 for chunk in uploaded_file.chunks():
@@ -494,15 +482,14 @@ class FileUploadView(APIView):
                 {
                     "code": "storage_error",
                     "error": (
-                        "File could not be saved to storage. "
-                        "Please retry the upload."
+                        "File could not be saved to storage. Please retry the upload."
                     ),
                 },
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
         # --- Replace existing record if re-uploaded ---
-        existing = RetinalImage.objects.filter(
+        existing = SessionFile.objects.filter(
             session=session, file_type=file_type
         ).first()
         if existing:
@@ -531,8 +518,7 @@ class FileUploadView(APIView):
             except OSError:
                 pass
             logger.warning(
-                "Checksum mismatch for %s/%s session=%s: "
-                "expected %s, got %s",
+                "Checksum mismatch for %s/%s session=%s: expected %s, got %s",
                 subject_identifier,
                 file_type,
                 session.pk,
@@ -551,12 +537,12 @@ class FileUploadView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        retinal_image = RetinalImage.objects.create(
+        session_file = SessionFile.objects.create(
             session=session,
             file_type=file_type,
             original_filename=uploaded_file.name,
             stored_filename=stored_filename,
-            content_type=uploaded_file.content_type or "",
+            file_content_type=uploaded_file.content_type or "",
             file_size=uploaded_file.size,
             capture_datetime=capture_datetime,
             checksum=stored_checksum,
@@ -572,6 +558,6 @@ class FileUploadView(APIView):
         )
 
         return Response(
-            _image_response_data(retinal_image),
+            _image_response_data(session_file),
             status=status.HTTP_201_CREATED,
         )
