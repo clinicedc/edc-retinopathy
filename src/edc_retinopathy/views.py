@@ -16,12 +16,13 @@ def _get_storage_dir() -> Path:
 
 
 @login_required
-def report_view(request, session_file_id: str) -> HttpResponse:
+def report_view(request, session_file_id: str) -> HttpResponse:  # noqa: ARG001
     """Serve a stored HTML report for viewing in the browser."""
     session_file = get_object_or_404(SessionFile, pk=session_file_id)
     stored_path = _get_storage_dir() / session_file.stored_filename
     if not stored_path.is_file():
-        raise Http404("Report file not found on disk.")
+        msg = "Report file not found on disk."
+        raise Http404(msg)
     content_type = session_file.file_content_type or "text/html"
     return HttpResponse(
         stored_path.read_bytes(),

@@ -25,9 +25,9 @@ jobs:
 
       - name: Install dependencies
         run: |
-          uv sync --dev
+          uv sync --dev --no-sources
           uv pip install "django~=${{ matrix.django-version }}.0"
 
       - name: Run tests
         run: |
-          uv run --dev python runtests.py
+          uv run --dev --no-sources runtests.py

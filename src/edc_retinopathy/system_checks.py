@@ -3,7 +3,8 @@ from __future__ import annotations
 from pathlib import Path
 
 from django.conf import settings
-from django.core.checks import Error, Warning as CheckWarning
+from django.core.checks import Error
+from django.core.checks import Warning as CheckWarning
 
 
 def storage_dir_check(**kwargs: object) -> list:  # noqa: ARG001
@@ -20,7 +21,7 @@ def storage_dir_check(**kwargs: object) -> list:  # noqa: ARG001
                     "base directory for retinal image storage."
                 ),
                 id="edc_retinopathy.W001",
-            )
+            ),
         )
         return errors
 
@@ -32,7 +33,7 @@ def storage_dir_check(**kwargs: object) -> list:  # noqa: ARG001
                 f"EDC_RETINOPATHY_STORAGE_DIR does not exist: {base}",
                 hint="Create the directory or update the setting.",
                 id="edc_retinopathy.E001",
-            )
+            ),
         )
         return errors
 
@@ -43,7 +44,7 @@ def storage_dir_check(**kwargs: object) -> list:  # noqa: ARG001
                 f"Missing 'images' subdirectory: {images_dir}",
                 hint="Create the 'images/' subdirectory.",
                 id="edc_retinopathy.E002",
-            )
+            ),
         )
 
     return errors

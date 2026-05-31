@@ -32,11 +32,13 @@ class StorageDirCheckTests(TestCase):
         self.assertEqual(errors[0].id, "edc_retinopathy.E001")
 
     def test_error_when_images_subdir_missing(self) -> None:
-        with tempfile.TemporaryDirectory() as tmpdir:
-            with self.settings(EDC_RETINOPATHY_STORAGE_DIR=tmpdir):
-                errors = storage_dir_check()
-                self.assertEqual(len(errors), 1)
-                self.assertEqual(errors[0].id, "edc_retinopathy.E002")
+        with (
+            tempfile.TemporaryDirectory() as tmpdir,
+            self.settings(EDC_RETINOPATHY_STORAGE_DIR=tmpdir),
+        ):
+            errors = storage_dir_check()
+            self.assertEqual(len(errors), 1)
+            self.assertEqual(errors[0].id, "edc_retinopathy.E002")
 
     def test_no_errors_when_valid(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:

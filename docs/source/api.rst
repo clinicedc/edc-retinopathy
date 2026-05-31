@@ -143,7 +143,7 @@ New session:
 
    {
      "subject_identifier": "105-10-0001-2",
-     "session_id": 42,
+     "camera_session_id": 42,
      "reactivated": false
    }
 
@@ -153,12 +153,12 @@ Reactivated session (incomplete session found within 24 hours):
 
    {
      "subject_identifier": "105-10-0001-2",
-     "session_id": 42,
+     "camera_session_id": 42,
      "reactivated": true
    }
 
-The ``session_id`` can be used in subsequent uploads via the
-``?session_id=`` query parameter to target a specific session. If
+The ``camera_session_id`` can be used in subsequent uploads via the
+``?camera_session_id=`` query parameter to target a specific session. If
 omitted, uploads are matched to the most recent active session.
 
 Error response (400)
@@ -220,7 +220,7 @@ Success response (200)
 .. code-block:: json
 
    {
-     "session_id": 42,
+     "camera_session_id": 42,
      "subject_identifier": "105-10-0001-2",
      "created_datetime": "2026-05-21T10:15:30.123456+00:00",
      "uploaded": ["left", "right"],
@@ -248,7 +248,7 @@ Step 2: Upload Left Eye Image
    * - **URL**
      - ``POST /api/retinopathy/<subject_identifier>/left/``
    * - **Query params**
-     - ``?session_id=42`` (optional) — target a specific session instead
+     - ``?camera_session_id=42`` (optional) — target a specific session instead
        of the most recent one. Useful after reconnection.
    * - **Content-Type**
      - ``multipart/form-data``
@@ -289,7 +289,7 @@ Success response (201)
 
    {
      "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-     "session_id": "f8e7d6c5-b4a3-2190-fedc-ba9876543210",
+     "camera_session_id": "f8e7d6c5-b4a3-2190-fedc-ba9876543210",
      "file_type": "left",
      "original_filename": "left_eye.jpg",
      "stored_filename": "8f3a9b2c1d4e5f6a7b8c9d0e1f2a3b4c.jpg",
@@ -586,7 +586,7 @@ Optional settings:
    EDC_RETINOPATHY_MAX_FILE_SIZE_MB = 10
 
    # Session expiry in minutes (default: 120).
-   # Uploads to sessions older than this are rejected (unless session_id
+   # Uploads to sessions older than this are rejected (unless camera_session_id
    # is specified explicitly in the query string).
    EDC_RETINOPATHY_SESSION_EXPIRE_MINUTES = 120
 
@@ -656,7 +656,7 @@ Using ``curl`` to demonstrate the complete protocol:
      -F "checksum=$CHECKSUM"
 
    # Step 3: Upload right eye image (targeting a specific session)
-   curl -X POST "$BASE/105-10-0001-2/right/?session_id=42" \
+   curl -X POST "$BASE/105-10-0001-2/right/?camera_session_id=42" \
      -H "Authorization: Token $TOKEN" \
      -F "file=@/path/to/right_eye.jpg" \
      -F "capture_datetime=2026-05-21T10:31:00Z"
