@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+from clinicedc_constants import YES
 from django.db import IntegrityError
+from django.db.models import ProtectedError
 from django.utils import timezone
 
 from edc_retinopathy.constants import REPORT_TYPE_COMBINED, REPORT_TYPE_PER_EYE
@@ -34,7 +36,7 @@ class CameraSessionModelTests(RetinopathyTestCaseMixin):
             self.create_camera_session(rs)
         self.assertEqual(
             CameraSession.objects.filter(
-                subject_identifier="105-10-0001-2"
+                subject_identifier="105-10-0001-2",
             ).count(),
             3,
         )
@@ -43,7 +45,8 @@ class CameraSessionModelTests(RetinopathyTestCaseMixin):
         rs = self.create_registered_subject()
         session = self.create_camera_session(rs, report_type=REPORT_TYPE_COMBINED)
         self.assertEqual(
-            session.expected_file_types, frozenset({"left", "right", "report"})
+            session.expected_file_types,
+            frozenset({"left", "right", "report"}),
         )
 
     def test_expected_file_types_per_eye(self) -> None:
@@ -56,35 +59,35 @@ class CameraSessionModelTests(RetinopathyTestCaseMixin):
 
     def test_is_complete_combined(self) -> None:
         rs = self.create_registered_subject()
-        session = self.create_camera_session(rs, report_type=REPORT_TYPE_COMBINED)
-        self.assertFalse(session.is_complete)
+        camera_session = self.create_camera_session(rs, report_type=REPORT_TYPE_COMBINED)
+        self.assertFalse(camera_session.is_complete)
         for ft in ("left", "right", "report"):
             SessionFile.objects.create(
-                session=session,
+                camera_session=camera_session,
                 file_type=ft,
                 original_filename=f"{ft}.jpg",
                 stored_filename=f"{ft}_stored.jpg",
                 capture_datetime=NOW(),
             )
-        self.assertTrue(session.is_complete)
+        self.assertTrue(camera_session.is_complete)
 
     def test_is_complete_per_eye(self) -> None:
         rs = self.create_registered_subject()
-        session = self.create_camera_session(rs, report_type=REPORT_TYPE_PER_EYE)
-        self.assertFalse(session.is_complete)
+        camera_session = self.create_camera_session(rs, report_type=REPORT_TYPE_PER_EYE)
+        self.assertFalse(camera_session.is_complete)
         for ft in ("left", "right", "left_report", "right_report"):
             SessionFile.objects.create(
-                session=session,
+                camera_session=camera_session,
                 file_type=ft,
                 original_filename=f"{ft}.ext",
                 stored_filename=f"{ft}_stored.ext",
                 capture_datetime=NOW(),
             )
-        self.assertTrue(session.is_complete)
+        self.assertTrue(camera_session.is_complete)
 
     def test_contraindicated_none_when_unanswered(self) -> None:
         rs = self.create_registered_subject()
-        session = self.create_camera_session(
+        camera_session = self.create_camera_session(
             rs,
             visual_impairment="",
             retinal_conditions="",
@@ -92,19 +95,18 @@ class CameraSessionModelTests(RetinopathyTestCaseMixin):
             photosensitive="",
             pregnant="",
         )
-        self.assertIsNone(session.contraindicated)
+        self.assertIsNone(camera_session.contraindicated)
 
     def test_contraindicated_true(self) -> None:
-        from clinicedc_constants import YES
 
         rs = self.create_registered_subject()
-        session = self.create_camera_session(rs, visual_impairment=YES)
-        self.assertTrue(session.contraindicated)
+        camera_session = self.create_camera_session(rs, visual_impairment=YES)
+        self.assertTrue(camera_session.contraindicated)
 
     def test_contraindicated_false(self) -> None:
         rs = self.create_registered_subject()
-        session = self.create_camera_session(rs)
-        self.assertFalse(session.contraindicated)
+        camera_session = self.create_camera_session(rs)
+        self.assertFalse(camera_session.contraindicated)
 
 
 class SessionFileModelTests(RetinopathyTestCaseMixin):
@@ -113,11 +115,11 @@ class SessionFileModelTests(RetinopathyTestCaseMixin):
     def setUp(self) -> None:
         super().setUp()
         self.rs = self.create_registered_subject()
-        self.session = self.create_camera_session(self.rs)
+        self.camera_session = self.create_camera_session(self.rs)
 
     def test_create_file(self) -> None:
         sf = SessionFile.objects.create(
-            session=self.session,
+            camera_session=self.camera_session,
             file_type="left",
             original_filename="left_eye.jpg",
             stored_filename="abc123.jpg",
@@ -128,7 +130,7 @@ class SessionFileModelTests(RetinopathyTestCaseMixin):
 
     def test_str(self) -> None:
         sf = SessionFile.objects.create(
-            session=self.session,
+            camera_session=self.camera_session,
             file_type="left",
             original_filename="left_eye.jpg",
             stored_filename="abc123.jpg",
@@ -139,7 +141,7 @@ class SessionFileModelTests(RetinopathyTestCaseMixin):
     def test_unique_constraint_session_original_filename(self) -> None:
         """Cannot create two files with same session + original_filename."""
         SessionFile.objects.create(
-            session=self.session,
+            camera_session=self.camera_session,
             file_type="left",
             original_filename="same.jpg",
             stored_filename="aaa.jpg",
@@ -147,7 +149,7 @@ class SessionFileModelTests(RetinopathyTestCaseMixin):
         )
         with self.assertRaises(IntegrityError):
             SessionFile.objects.create(
-                session=self.session,
+                camera_session=self.camera_session,
                 file_type="right",
                 original_filename="same.jpg",
                 stored_filename="bbb.jpg",
@@ -158,7 +160,7 @@ class SessionFileModelTests(RetinopathyTestCaseMixin):
         """Different file_types on same session are allowed."""
         for ft, fn in [("left", "a.jpg"), ("right", "b.jpg"), ("report", "c.pdf")]:
             SessionFile.objects.create(
-                session=self.session,
+                camera_session=self.camera_session,
                 file_type=ft,
                 original_filename=fn,
                 stored_filename=f"{ft}_stored",
@@ -168,16 +170,16 @@ class SessionFileModelTests(RetinopathyTestCaseMixin):
 
     def test_same_file_type_different_sessions(self) -> None:
         """Same file_type on different sessions is allowed."""
-        session2 = self.create_camera_session(self.rs)
+        camera_session2 = self.create_camera_session(self.rs)
         SessionFile.objects.create(
-            session=self.session,
+            camera_session=self.camera_session,
             file_type="left",
             original_filename="a.jpg",
             stored_filename="aaa.jpg",
             capture_datetime=NOW(),
         )
         SessionFile.objects.create(
-            session=session2,
+            camera_session=camera_session2,
             file_type="left",
             original_filename="b.jpg",
             stored_filename="bbb.jpg",
@@ -187,50 +189,49 @@ class SessionFileModelTests(RetinopathyTestCaseMixin):
 
     def test_protect_on_delete(self) -> None:
         """Deleting a session with files raises ProtectedError."""
-        from django.db.models import ProtectedError
 
         SessionFile.objects.create(
-            session=self.session,
+            camera_session=self.camera_session,
             file_type="left",
             original_filename="a.jpg",
             stored_filename="aaa.jpg",
             capture_datetime=NOW(),
         )
         with self.assertRaises(ProtectedError):
-            self.session.delete()
+            self.camera_session.delete()
 
     def test_files_related_name(self) -> None:
         """Session.files reverse relation works."""
         SessionFile.objects.create(
-            session=self.session,
+            camera_session=self.camera_session,
             file_type="left",
             original_filename="a.jpg",
             stored_filename="aaa.jpg",
             capture_datetime=NOW(),
         )
         SessionFile.objects.create(
-            session=self.session,
+            camera_session=self.camera_session,
             file_type="right",
             original_filename="b.jpg",
             stored_filename="bbb.jpg",
             capture_datetime=NOW(),
         )
-        self.assertEqual(self.session.files.count(), 2)
+        self.assertEqual(self.camera_session.files.count(), 2)
 
     def test_stored_filename_unique(self) -> None:
         """stored_filename must be unique across all files."""
         SessionFile.objects.create(
-            session=self.session,
+            camera_session=self.camera_session,
             file_type="left",
             original_filename="a.jpg",
             stored_filename="same_name.jpg",
             capture_datetime=NOW(),
         )
         rs2 = self.create_registered_subject(subject_identifier="105-10-0002-3")
-        session2 = self.create_camera_session(rs2)
+        camera_session2 = self.create_camera_session(rs2)
         with self.assertRaises(IntegrityError):
             SessionFile.objects.create(
-                session=session2,
+                camera_session=camera_session2,
                 file_type="left",
                 original_filename="b.jpg",
                 stored_filename="same_name.jpg",
@@ -241,7 +242,7 @@ class SessionFileModelTests(RetinopathyTestCaseMixin):
         """capture_datetime is a required field."""
         with self.assertRaises(IntegrityError):
             SessionFile.objects.create(
-                session=self.session,
+                camera_session=self.camera_session,
                 file_type="left",
                 original_filename="a.jpg",
                 stored_filename="no_capture.jpg",

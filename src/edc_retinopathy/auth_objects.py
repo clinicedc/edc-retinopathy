@@ -15,7 +15,7 @@ for model_cls in app_config.get_models():
     ):
         for action in ["view_", "add_", "change_", "delete_", "view_historical"]:
             codename = f".{action}".join(model_cls._meta.label_lower.split("."))
-            codenames.append(codename)  # noqa: PERF401
+            codenames.append(codename)
 
 codenames.append(f"{EDC_RETINOPATHY}.view_registeredsubjectproxy")
 codenames.sort()

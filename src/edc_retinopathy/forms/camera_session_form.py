@@ -13,7 +13,7 @@ class CameraSessionForm(forms.ModelForm):
         if not registered_subject:
             self.add_error("registered_subject", "This field is required.")
         else:
-            gender = getattr(registered_subject, "gender")
+            gender = registered_subject.gender
             pregnant = cleaned_data.get("pregnant", "")
             if gender == MALE and pregnant and pregnant != NOT_APPLICABLE:
                 self.add_error(

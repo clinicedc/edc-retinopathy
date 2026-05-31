@@ -3,7 +3,7 @@
 edc-retinopathy
 ---------------
 
-This module exposes a REST API for integrating a retinopathy camera.
+This module adds a diabetic retinopathy screening form and exposes a REST API for integrating with a fundus camera.
 
 This can be integrated into clinicedc systems.
 

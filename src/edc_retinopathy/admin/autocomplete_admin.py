@@ -18,7 +18,7 @@ class RegisteredSubjectProxyAdmin(BaseRegisteredSubjectAdmin):
                     "initials",
                     "dob",
                     "gender",
-                )
+                ),
             },
         ),
     )
