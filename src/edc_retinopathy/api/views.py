@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import logging
 import os
@@ -7,6 +8,7 @@ import tempfile
 import uuid
 from datetime import timedelta
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from django.conf import settings
 from django.utils import timezone
@@ -21,6 +23,9 @@ from rest_framework.views import APIView
 from ..models import CameraSession, SessionFile
 from .serializers import FileUploadSerializer, ResolveSubjectSerializer
 
+if TYPE_CHECKING:
+    from django.db.models import QuerySet
+
 logger = logging.getLogger(__name__)
 
 # Magic bytes for basic content validation
@@ -29,7 +34,7 @@ _PDF_MAGIC = b"%PDF"
 _HTML_MARKERS = (b"<!doctype", b"<html", b"<head", b"<body")
 
 _VALID_FILE_TYPES = frozenset(
-    {"left", "right", "report", "left_report", "right_report"}
+    {"left", "right", "report", "left_report", "right_report"},
 )
 _REPORT_FILE_TYPES = frozenset({"report", "left_report", "right_report"})
 _IMAGE_FILE_TYPES = frozenset({"left", "right"})
@@ -41,7 +46,9 @@ _DEFAULT_SESSION_EXPIRE_MINUTES = 120
 
 def _get_max_file_size_bytes() -> int:
     mb = getattr(
-        settings, "EDC_RETINOPATHY_MAX_FILE_SIZE_MB", _DEFAULT_MAX_FILE_SIZE_MB
+        settings,
+        "EDC_RETINOPATHY_MAX_FILE_SIZE_MB",
+        _DEFAULT_MAX_FILE_SIZE_MB,
     )
     return int(mb * 1024 * 1024)
 
@@ -52,7 +59,7 @@ def _get_session_expire_minutes() -> int:
             settings,
             "EDC_RETINOPATHY_SESSION_EXPIRE_MINUTES",
             _DEFAULT_SESSION_EXPIRE_MINUTES,
-        )
+        ),
     )
 
 
@@ -62,7 +69,7 @@ def _get_storage_dir() -> Path:
 
 
 def _validate_subject_against_session(
-    session: CameraSession,
+    camera_session: CameraSession,
     initials: str,
     sex: str,
     age: int | None,
@@ -77,19 +84,22 @@ def _validate_subject_against_session(
     """
     errors: list[str] = []
 
-    if session.initials and session.initials.upper() != initials.upper():
+    if camera_session.initials and camera_session.initials.upper() != initials.upper():
         errors.append(
-            f"Initials mismatch: expected '{session.initials}', got '{initials}'."
+            f"Initials mismatch: expected '{camera_session.initials}', got '{initials}'.",
         )
-    if session.gender and session.gender.upper() != sex.upper():
+    if camera_session.gender and camera_session.gender.upper() != sex.upper():
         errors.append(
-            f"Sex mismatch: expected '{session.gender}', got '{sex}'."
+            f"Sex mismatch: expected '{camera_session.gender}', got '{sex}'.",
         )
-    if age is not None and session.age_in_years is not None:
-        if abs(session.age_in_years - age) > 1:
-            errors.append(
-                f"Age mismatch: expected ~{session.age_in_years}, got {age}."
-            )
+    if (
+        age is not None
+        and camera_session.age_in_years is not None
+        and abs(camera_session.age_in_years - age) > 1
+    ):
+        errors.append(
+            f"Age mismatch: expected ~{camera_session.age_in_years}, got {age}.",
+        )
     if errors:
         return {"valid": False, "code": "validation_mismatch", "errors": errors}
     return {"valid": True, "code": "ok", "errors": []}
@@ -108,17 +118,16 @@ def _validate_file_content(uploaded_file, file_type: str) -> str | None:
         is_html = any(stripped.lower().startswith(m) for m in _HTML_MARKERS)
         if not (is_pdf or is_html):
             return "Report file does not appear to be a valid PDF or HTML."
-    else:
-        # Accept JPEG and PNG for eye images
-        if not (head.startswith(_JPEG_MAGIC) or head.startswith(b"\x89PNG")):
-            return "Image file does not appear to be a valid JPEG or PNG."
+    # Accept JPEG and PNG for eye images
+    elif not (head.startswith(_JPEG_MAGIC) or head.startswith(b"\x89PNG")):
+        return "Image file does not appear to be a valid JPEG or PNG."
     return None
 
 
-def _compute_sha256(file_path: str) -> str:
+def _compute_sha256(file_path: Path) -> str:
     """Compute SHA-256 hex digest of a file on disk."""
     h = hashlib.sha256()
-    with open(file_path, "rb") as f:
+    with file_path.open("rb") as f:
         for chunk in iter(lambda: f.read(65536), b""):
             h.update(chunk)
     return h.hexdigest()
@@ -128,7 +137,7 @@ def _image_response_data(session_file: SessionFile) -> dict:
     """Build the standard response payload for a SessionFile."""
     return {
         "id": str(session_file.pk),
-        "session_id": session_file.session_id,
+        "camera_session_id": session_file.camera_session_id,
         "file_type": session_file.file_type,
         "original_filename": session_file.original_filename,
         "stored_filename": session_file.stored_filename,
@@ -136,19 +145,19 @@ def _image_response_data(session_file: SessionFile) -> dict:
     }
 
 
-def _find_session(
+def _find_camera_session(
     subject_identifier: str,
-    session_id: str | None = None,
+    camera_session_id: str | None = None,
 ) -> CameraSession | None:
     """Find an active session by subject_identifier.
 
-    If session_id is provided, look up that specific session (no expiry
+    If camera_session_id is provided, look up that specific session (no expiry
     check — the caller explicitly chose it). Otherwise find the most
     recent non-expired session.
     """
-    if session_id is not None:
+    if camera_session_id is not None:
         return CameraSession.objects.filter(
-            pk=session_id,
+            pk=camera_session_id,
             subject_identifier=subject_identifier,
         ).first()
     expire_minutes = _get_session_expire_minutes()
@@ -180,10 +189,10 @@ class PingView(APIView):
     Returns 200 with {"status": "ok"} if the server and auth are working.
     """
 
-    authentication_classes = [TokenAuthentication]
-    permission_classes = [IsAuthenticated]
+    authentication_classes = (TokenAuthentication,)
+    permission_classes = (IsAuthenticated,)
 
-    def get(self, request: Request) -> Response:
+    def get(self, request: Request) -> Response:  # noqa ARG002
         return Response({"status": "ok"}, status=status.HTTP_200_OK)
 
 
@@ -195,12 +204,12 @@ class ResolveSubjectView(APIView):
     A CameraSession must be created in the EDC by the clinician before
     the camera exam. This endpoint finds the most recent incomplete
     session for the subject, validates demographics from the camera's
-    local DB, and returns the session_id for file uploads.
+    local DB, and returns the camera_session_id for file uploads.
     """
 
-    authentication_classes = [TokenAuthentication]
-    permission_classes = [IsAuthenticated]
-    parser_classes = [JSONParser]
+    authentication_classes = (TokenAuthentication,)
+    permission_classes = (IsAuthenticated,)
+    parser_classes = (JSONParser,)
 
     def post(self, request: Request) -> Response:
         serializer = ResolveSubjectSerializer(data=request.data)
@@ -212,22 +221,22 @@ class ResolveSubjectView(APIView):
 
         # --- Find the most recent eligible session ---
         # Walk sessions newest-first; skip contraindicated and complete.
-        sessions = CameraSession.objects.filter(
+        qs: QuerySet[CameraSession] = CameraSession.objects.filter(
             subject_identifier=subject_identifier,
         ).order_by("-report_datetime")
 
-        session = None
-        for candidate in sessions:
-            if candidate.contraindicated:
+        camera_session_obj = None
+        for obj in qs:
+            if obj.contraindicated:
                 continue
-            if candidate.is_complete:
+            if obj.is_complete:
                 continue
-            session = candidate
+            camera_session_obj = obj
             break
 
-        if session is None:
-            # Distinguish "no sessions at all" from "all ineligible".
-            if not sessions.exists():
+        if camera_session_obj is None:
+            # Distinguish "no camera_session_objs at all" from "all ineligible".
+            if not qs.exists():
                 logger.warning(
                     "No camera session for %s (device=%s). "
                     "Create one in the EDC before the exam.",
@@ -240,14 +249,13 @@ class ResolveSubjectView(APIView):
                         "errors": [
                             "No camera session found for this subject. "
                             "Create one in the EDC before conducting "
-                            "the exam."
+                            "the exam.",
                         ],
                     },
                     status=status.HTTP_404_NOT_FOUND,
                 )
             logger.warning(
-                "All sessions for %s are complete or "
-                "contraindicated (device=%s).",
+                "All sessions for %s are complete or contraindicated (device=%s).",
                 subject_identifier,
                 device_id,
             )
@@ -256,18 +264,18 @@ class ResolveSubjectView(APIView):
                     "code": "no_eligible_session",
                     "errors": [
                         "All sessions for this subject are complete or "
-                        "contraindicated. Create a new session in the "
-                        "EDC to upload again."
+                        "contraindicated. Create a new camera session in the "
+                        "EDC to upload again.",
                     ],
                 },
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        uploaded = set(session.files.values_list("file_type", flat=True))
+        uploaded = set(camera_session_obj.files.values_list("file_type", flat=True))
 
         # --- Validate demographics against session ---
         result = _validate_subject_against_session(
-            session=session,
+            camera_session=camera_session_obj,
             initials=data["initials"],
             sex=data["sex"],
             age=data.get("age"),
@@ -276,7 +284,7 @@ class ResolveSubjectView(APIView):
             logger.warning(
                 "Resolve failed for %s session=%s (device=%s): %s",
                 subject_identifier,
-                session.pk,
+                camera_session_obj.pk,
                 device_id,
                 "; ".join(result["errors"]),
             )
@@ -286,13 +294,13 @@ class ResolveSubjectView(APIView):
             )
 
         # --- Update device_id if the session doesn't have one ---
-        if device_id and not session.device_id:
-            session.device_id = device_id
-            session.save(update_fields=["device_id"])
+        if device_id and not camera_session_obj.device_id:
+            camera_session_obj.device_id = device_id
+            camera_session_obj.save(update_fields=["device_id"])
 
         logger.info(
             "Resolved session %s for %s (device=%s, uploaded=%s)",
-            session.pk,
+            camera_session_obj.pk,
             subject_identifier,
             device_id,
             sorted(uploaded),
@@ -300,8 +308,8 @@ class ResolveSubjectView(APIView):
 
         return Response(
             {
-                "subject_identifier": session.subject_identifier,
-                "session_id": session.pk,
+                "subject_identifier": camera_session_obj.subject_identifier,
+                "camera_session_id": camera_session_obj.pk,
                 "reactivated": bool(uploaded),
             },
             status=status.HTTP_200_OK,
@@ -309,28 +317,28 @@ class ResolveSubjectView(APIView):
 
 
 class SessionStatusView(APIView):
-    """Return the current session status for a subject.
+    """Return the current camera_session_obj status for a subject.
 
     GET /api/retinopathy/<subject_identifier>/status/
-    Returns the most recent session and which file types have been received.
+    Returns the most recent camera_session_obj and which file types have been received.
     """
 
-    authentication_classes = [TokenAuthentication]
-    permission_classes = [IsAuthenticated]
+    authentication_classes = (TokenAuthentication,)
+    permission_classes = (IsAuthenticated,)
 
     def get(
         self,
-        request: Request,
+        request: Request,  # noqa: ARG002
         subject_identifier: str,
     ) -> Response:
-        session = (
+        camera_session_obj = (
             CameraSession.objects.filter(
                 subject_identifier=subject_identifier,
             )
             .order_by("-report_datetime")
             .first()
         )
-        if not session:
+        if not camera_session_obj:
             return Response(
                 {
                     "code": "no_session",
@@ -339,17 +347,17 @@ class SessionStatusView(APIView):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
-        uploaded = set(session.files.values_list("file_type", flat=True))
-        expected = session.expected_file_types
+        uploaded = set(camera_session_obj.files.values_list("file_type", flat=True))
+        expected = camera_session_obj.expected_file_types
 
         return Response(
             {
-                "session_id": session.pk,
-                "subject_identifier": session.subject_identifier,
-                "report_datetime": session.report_datetime.isoformat(),
+                "camera_session_id": camera_session_obj.pk,
+                "subject_identifier": camera_session_obj.subject_identifier,
+                "report_datetime": camera_session_obj.report_datetime.isoformat(),
                 "uploaded": sorted(uploaded),
                 "missing": sorted(expected - uploaded),
-                "complete": session.is_complete,
+                "complete": camera_session_obj.is_complete,
             },
             status=status.HTTP_200_OK,
         )
@@ -363,18 +371,18 @@ class FileUploadView(APIView):
     POST /api/retinopathy/<subject_identifier>/report/
 
     Query params:
-        session_id (optional): Target a specific session instead of the
+        camera_session_id (optional): Target a specific camera_session_obj instead of the
             most recent one. Useful after reconnection.
 
     Body: multipart/form-data with 'file', 'capture_datetime', and
     optional 'checksum' (SHA-256 hex digest) fields.
     """
 
-    authentication_classes = [TokenAuthentication]
-    permission_classes = [IsAuthenticated]
-    parser_classes = [MultiPartParser, FormParser]
+    authentication_classes = (TokenAuthentication,)
+    permission_classes = (IsAuthenticated,)
+    parser_classes = (MultiPartParser, FormParser)
 
-    def post(
+    def post(  # noqa: PLR0911
         self,
         request: Request,
         subject_identifier: str,
@@ -432,17 +440,19 @@ class FileUploadView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # --- Find session (by explicit session_id or most recent) ---
-        raw_session_id = request.query_params.get("session_id")
-        session_id = raw_session_id if raw_session_id else None
+        # --- Find camera_session_obj (by explicit camera_session_id or most recent) ---
+        camera_session_id = request.query_params.get("camera_session_id") or None
 
-        session = _find_session(subject_identifier, session_id=session_id)
-        if not session:
+        camera_session_obj = _find_camera_session(
+            subject_identifier,
+            camera_session_id=camera_session_id,
+        )
+        if not camera_session_obj:
             expire_minutes = _get_session_expire_minutes()
             error_msg = "No active session found. Call resolve first."
-            if session_id:
+            if camera_session_id:
                 error_msg = (
-                    f"Session {session_id} not found for subject {subject_identifier}."
+                    f"Session {camera_session_id} not found for subject {subject_identifier}."
                 )
             else:
                 error_msg += f" Sessions expire after {expire_minutes} minutes."
@@ -465,63 +475,55 @@ class FileUploadView(APIView):
             with os.fdopen(fd, "wb") as out:
                 for chunk in uploaded_file.chunks():
                     out.write(chunk)
-            os.rename(tmp_path, str(dest))
-        except OSError as e:
-            try:
-                os.unlink(tmp_path)
-            except OSError:
-                pass
+            os.rename(tmp_path, str(dest))  # noqa: PTH104
+        except OSError:
+            with contextlib.suppress(OSError):
+                os.unlink(tmp_path)  # noqa: PTH108
             logger.exception(
-                "Failed to write %s for %s session=%s: %s",
+                "Failed to write %s for %s session=%s",
                 file_type,
                 subject_identifier,
-                session.pk,
-                e,
+                camera_session_obj.pk,
             )
             return Response(
                 {
                     "code": "storage_error",
-                    "error": (
-                        "File could not be saved to storage. Please retry the upload."
-                    ),
+                    "error": "File could not be saved to storage. Please retry the upload.",
                 },
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
         # --- Replace existing record if re-uploaded ---
         existing = SessionFile.objects.filter(
-            session=session, file_type=file_type
+            camera_session=camera_session_obj,
+            file_type=file_type,
         ).first()
         if existing:
             # Remove old file from disk (new file is already safely written)
             old_path = _get_storage_dir() / existing.stored_filename
-            try:
-                os.unlink(str(old_path))
-            except OSError:
-                pass
+            with contextlib.suppress(OSError):
+                old_path.unlink()
             logger.info(
                 "Replacing %s for %s session=%s (old=%s)",
                 file_type,
                 subject_identifier,
-                session.pk,
+                camera_session_obj.pk,
                 existing.stored_filename,
             )
             existing.delete()
 
         # --- Compute SHA-256 of stored file (used for verification and response) ---
-        stored_checksum = _compute_sha256(str(dest))
+        stored_checksum = _compute_sha256(dest)
 
         if checksum and stored_checksum != checksum.lower():
             # Delete the corrupt file
-            try:
-                os.unlink(str(dest))
-            except OSError:
-                pass
+            with contextlib.suppress(OSError):
+                dest.unlink()
             logger.warning(
                 "Checksum mismatch for %s/%s session=%s: expected %s, got %s",
                 subject_identifier,
                 file_type,
-                session.pk,
+                camera_session_obj.pk,
                 checksum.lower(),
                 stored_checksum,
             )
@@ -538,7 +540,7 @@ class FileUploadView(APIView):
             )
 
         session_file = SessionFile.objects.create(
-            session=session,
+            camera_session=camera_session_obj,
             file_type=file_type,
             original_filename=uploaded_file.name,
             stored_filename=stored_filename,
@@ -552,7 +554,7 @@ class FileUploadView(APIView):
             "Received %s for %s session=%s (%s bytes, stored=%s)",
             file_type,
             subject_identifier,
-            session.pk,
+            camera_session_obj.pk,
             uploaded_file.size,
             stored_filename,
         )

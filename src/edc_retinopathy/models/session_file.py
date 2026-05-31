@@ -3,7 +3,6 @@ from __future__ import annotations
 from django.db import models
 from edc_model.models import BaseUuidModel, HistoricalRecords
 from edc_prn.prn_model_manager import PrnModelManager
-from edc_sites.managers import CurrentSiteManager
 
 from ..choices import FILE_CONTENT_TYPE_CHOICES, FILE_TYPE_CHOICES
 
@@ -15,7 +14,7 @@ class SessionFile(BaseUuidModel):
     a left-eye image, right-eye image, or report (PDF or HTML).
     """
 
-    session = models.ForeignKey(
+    camera_session = models.ForeignKey(
         "edc_retinopathy.CameraSession",
         on_delete=models.PROTECT,
         related_name="files",
@@ -74,9 +73,9 @@ class SessionFile(BaseUuidModel):
     class Meta(BaseUuidModel.Meta):
         verbose_name = "Session file"
         verbose_name_plural = "Session files"
-        constraints = [
+        constraints = (
             models.UniqueConstraint(
-                fields=["session", "original_filename"],
+                fields=["camera_session", "original_filename"],
                 name="unique_session_orig_filename",
             ),
-        ]
+        )

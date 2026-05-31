@@ -1,31 +1,86 @@
 [project]
 name = "edc-retinopathy"
-version = "0.2.0"
-description = "Retinopathy camera integration for clinicedc"
+version = "0.3.0"
+description = "Add a diabetic retinopathy screening form and API to use with a fundus camera for clinicedc"
 readme = "README.rst"
 requires-python = ">=3.12,<3.15"
 dependencies = [
-    "clinicedc>=3.1.5",
+    "clinicedc>=4.0.0",
     "django>=5.2,<6.1",
     "djangorestframework>=3.16.0",
+    "djangorestframework-stubs>=3.17.0",
+    "ruff>=0.15.15",
     "watchdog>=6.0.0",
 ]
 
 [dependency-groups]
 dev = [
     "clinicedc-tests>=1.2.2",
+    "ruff>=0.15.15",
     "sphinx>=9.1.0",
 ]
 
-[build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
+[project.urls]
+Homepage = "https://github.com/clinicedc/edc-retinopathy"
 
-[tool.hatch.build.targets.wheel]
-packages = ["src/edc_retinopathy"]
+[build-system]
+requires = ["uv_build>=0.11.16,<0.12.0"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-root = "src"
+source-exclude = ["bin"]
+namespace = false
 
 [tool.uv.sources]
 clinicedc = { path = "../clinicedc", editable = true }
 clinicedc-constants = { path = "../clinicedc-constants", editable = true }
 clinicedc-tests = { path = "../clinicedc-tests", editable = true }
 clinicedc-utils = { path = "../clinicedc-utils", editable = true }
+
+[tool.ruff]
+line-length = 95
+indent-width = 4
+target-version = "py312"
+exclude = ["migrations", ".tox", ".venv"]
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401"]
+
+[tool.ruff.lint.mccabe]
+max-complexity = 12
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"
+
+[tool.ruff.lint]
+select = [
+    "A",
+    "ARG",
+    "B",
+    "C90",
+    "COM",
+    "DTZ",
+    "E",
+    "F",
+    "FA",
+    "FURB",
+    "I",
+    "INT",
+    "N",
+    "PERF",
+    "PL",
+    "PLR",
+    "PTH",
+    "RET",
+    "RUF",
+    # "S",
+    "SIM",
+    "T20",
+    "TRY",
+    "UP",
+    "W",
+]

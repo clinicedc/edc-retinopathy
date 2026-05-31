@@ -4,6 +4,6 @@ from .session_file_admin import SessionFileAdmin
 
 __all__ = [
     "CameraSessionAdmin",
-    "SessionFileAdmin",
     "RegisteredSubjectProxyAdmin",
+    "SessionFileAdmin",
 ]

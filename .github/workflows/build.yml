@@ -12,9 +12,25 @@ jobs:
       fail-fast: false
       matrix:
         python-version: ['3.12', '3.13', '3.14']
-        django-version: ['5.2', '6.0']
+        django-version: ['5.2', '6.0', 'dev']
+
+    services:
+      mysql:
+        image: mysql:latest
+        env:
+          MYSQL_DATABASE: mysql
+          MYSQL_ROOT_PASSWORD: root  # pragma: allowlist secret
+        ports:
+          - 3306:3306
+        options: --health-cmd="mysqladmin ping" --health-interval=10s --health-timeout=5s --health-retries=3
 
     steps:
+      - name: Install pycups and words dependency
+        run: |
+          sudo sed -i 's/azure\.//' /etc/apt/sources.list
+          sudo apt-get -y update
+          sudo apt-get install libcups2-dev wamerican
+
       - uses: actions/checkout@v4
 
       - name: Install uv and set the python version
@@ -25,9 +41,13 @@ jobs:
 
       - name: Install dependencies
         run: |
-          uv sync --dev
-          uv pip install "django~=${{ matrix.django-version }}.0"
+          uv sync --dev --no-sources
+          if [ "${{ matrix.django-version }}" = "dev" ]; then
+            uv pip install "django @ git+https://github.com/django/django.git@main"
+          else
+            uv pip install "django~=${{ matrix.django-version }}.0"
+          fi
 
       - name: Run tests
         run: |
-          uv run --dev python runtests.py
+          uv run --dev --no-sources runtests.py

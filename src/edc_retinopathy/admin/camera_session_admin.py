@@ -23,9 +23,9 @@ class CameraSessionAdmin(
     show_object_tools: bool = True
     date_hierarchy = "created"
 
-    autocomplete_fields = ["registered_subject"]
+    autocomplete_fields = ("registered_subject",)
 
-    list_display = [
+    list_display = (
         "subject_identifier",
         "eligible",
         "gender",
@@ -35,9 +35,9 @@ class CameraSessionAdmin(
         "file_count",
         "device_id",
         "created",
-    ]
-    list_filter = [("report_datetime", DateRangeFilterBuilder()), "device_id", "site"]
-    search_fields = ["registered_subject__subject_identifier"]
+    )
+    list_filter = (("report_datetime", DateRangeFilterBuilder()), "device_id", "site")
+    search_fields = ("registered_subject__subject_identifier",)
 
     fieldsets = (
         (
@@ -71,7 +71,7 @@ class CameraSessionAdmin(
         audit_fieldset_tuple,
     )
 
-    radio_fields = {
+    radio_fields = {  # noqa: RUF012
         "visual_impairment": admin.VERTICAL,
         "retinal_conditions": admin.VERTICAL,
         "ocular_interventions": admin.VERTICAL,

@@ -26,7 +26,7 @@ from .registered_subject_proxy import RegisteredSubjectProxy
 
 
 class CameraSession(
-    SiteModelMixin, NonUniqueSubjectIdentifierFieldMixin, BaseUuidModel
+    SiteModelMixin, NonUniqueSubjectIdentifierFieldMixin, BaseUuidModel,
 ):
     """Represents a single retinopathy camera session for a subject.
 
@@ -34,7 +34,7 @@ class CameraSession(
     """
 
     registered_subject = models.ForeignKey(
-        RegisteredSubjectProxy, on_delete=models.PROTECT
+        RegisteredSubjectProxy, on_delete=models.PROTECT,
     )
 
     subject_identifier = models.CharField(max_length=50, null=True, editable=False)
@@ -116,7 +116,7 @@ class CameraSession(
         self.gender = self.registered_subject.gender
         self.initials = self.registered_subject.initials
         self.age_in_years = abs(
-            relativedelta(timezone.now().date(), self.registered_subject.dob).years
+            relativedelta(timezone.now().date(), self.registered_subject.dob).years,
         )
         return super().save(*args, **kwargs)
 

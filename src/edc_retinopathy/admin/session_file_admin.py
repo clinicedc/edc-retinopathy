@@ -5,7 +5,6 @@ from django.urls import reverse
 from django.utils.html import format_html
 from django_audit_fields import ModelAdminAuditFieldsMixin
 from django_revision.modeladmin_mixin import ModelAdminRevisionMixin
-from edc_model_admin.dashboard import ModelAdminSubjectDashboardMixin
 from edc_model_admin.history import SimpleHistoryAdmin
 from edc_model_admin.mixins import (
     ModelAdminFormAutoNumberMixin,
@@ -19,7 +18,7 @@ from edc_model_admin.mixins import (
 from edc_notification.modeladmin_mixins import NotificationModelAdminMixin
 
 from ..admin_site import edc_retinopathy_admin
-from ..constants import REPORT, LEFT_REPORT, RIGHT_REPORT
+from ..constants import LEFT_REPORT, REPORT, RIGHT_REPORT
 from ..models import SessionFile
 
 
@@ -42,7 +41,7 @@ class SessionFileAdmin(
     list_per_page = 10
     show_cancel = True
 
-    list_display = [
+    list_display = (
         "original_filename",
         "file_type",
         "view_report_link",
@@ -51,12 +50,18 @@ class SessionFileAdmin(
         "file_size",
         "capture_datetime",
         "received_datetime",
-    ]
-    list_filter = ["file_type", "file_content_type"]
-    search_fields = ["original_filename", "session__subject_identifier"]
-    readonly_fields = [
+    )
+    list_filter = (
+        "file_type",
+        "file_content_type",
+    )
+    search_fields = (
+        "original_filename",
+        "camera_session__subject_identifier",
+    )
+    readonly_fields = (
         "id",
-        "session",
+        "camera_session",
         "file_type",
         "original_filename",
         "stored_filename",
@@ -65,7 +70,7 @@ class SessionFileAdmin(
         "checksum",
         "capture_datetime",
         "received_datetime",
-    ]
+    )
 
     @admin.display(description="Session")
     def session_link(self, obj: SessionFile) -> str:
@@ -75,8 +80,8 @@ class SessionFileAdmin(
         return format_html(
             '<a href="{}?id__exact={}">{}</a>',
             url,
-            obj.session_id,
-            obj.session,
+            obj.camera_session_id,
+            obj.camera_session,
         )
 
     @admin.display(description="Report")
@@ -92,14 +97,14 @@ class SessionFileAdmin(
 
     def has_change_permission(
         self,
-        request: object,
+        request: object,  # noqa: ARG002
         obj: object = None,  # noqa: ARG002
     ) -> bool:
         return False
 
     def has_delete_permission(
         self,
-        request: object,
+        request: object,  # noqa: ARG002
         obj: object = None,  # noqa: ARG002
     ) -> bool:
         return False
