@@ -42,7 +42,11 @@ jobs:
       - name: Install dependencies
         run: |
           uv sync --dev --no-sources
-          uv pip install "django~=${{ matrix.django-version }}.0"
+          if [ "${{ matrix.django-version }}" = "dev" ]; then
+            uv pip install "django @ git+https://github.com/django/django.git@main"
+          else
+            uv pip install "django~=${{ matrix.django-version }}.0"
+          fi
 
       - name: Run tests
         run: |
