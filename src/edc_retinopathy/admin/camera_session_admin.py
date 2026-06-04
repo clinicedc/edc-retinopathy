@@ -68,6 +68,8 @@ class CameraSessionAdmin(
                 ),
             },
         ),
+        ("Opthamologist's comment", {"fields": ("op_comment", "op_referral")}),
+        ("Referral", {"fields": ("referred_to", "referred_date", "may_contact")}),
         audit_fieldset_tuple,
     )
 
