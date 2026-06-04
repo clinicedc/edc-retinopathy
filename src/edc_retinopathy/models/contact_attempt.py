@@ -57,6 +57,6 @@ class ContactAttempt(
     on_site = CurrentSiteManager()
     history = HistoricalRecords(inherit=True)
 
-    class Meta:
+    class Meta(BaseUuidModel.Meta):
         verbose_name = "Contact Attempt"
         verbose_name_plural = "Contact Attempts"
