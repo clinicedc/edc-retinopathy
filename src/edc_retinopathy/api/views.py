@@ -5,7 +5,6 @@ import hashlib
 import logging
 import os
 import tempfile
-import uuid
 from datetime import timedelta
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -31,13 +30,16 @@ logger = logging.getLogger(__name__)
 # Magic bytes for basic content validation
 _JPEG_MAGIC = b"\xff\xd8\xff"
 _PDF_MAGIC = b"%PDF"
+_DICOM_MAGIC = b"DICM"  # at offset 128
+_DICOM_PREAMBLE_LEN = 128
 _HTML_MARKERS = (b"<!doctype", b"<html", b"<head", b"<body")
 
 _VALID_FILE_TYPES = frozenset(
-    {"left", "right", "report", "left_report", "right_report"},
+    {"left", "right", "report", "left_report", "right_report", "left_dicom", "right_dicom"},
 )
 _REPORT_FILE_TYPES = frozenset({"report", "left_report", "right_report"})
 _IMAGE_FILE_TYPES = frozenset({"left", "right"})
+_DICOM_FILE_TYPES = frozenset({"left_dicom", "right_dicom"})
 
 # Default settings
 _DEFAULT_MAX_FILE_SIZE_MB = 10
@@ -68,45 +70,17 @@ def _get_storage_dir() -> Path:
     return base / "images"
 
 
-def _validate_subject_against_session(
-    camera_session: CameraSession,
-    initials: str,
-    sex: str,
-    age: int | None,
-) -> dict:
-    """Validate demographics from the camera against a CameraSession.
-
-    The CameraSession is populated from RegisteredSubject when it is
-    saved, so this cross-checks the camera's local DB against the EDC.
-
-    Returns a dict with 'valid' (bool), 'code' (str), and
-    'errors' (list of str).
-    """
-    errors: list[str] = []
-
-    if camera_session.initials and camera_session.initials.upper() != initials.upper():
-        errors.append(
-            f"Initials mismatch: expected '{camera_session.initials}', got '{initials}'.",
-        )
-    if camera_session.gender and camera_session.gender.upper() != sex.upper():
-        errors.append(
-            f"Sex mismatch: expected '{camera_session.gender}', got '{sex}'.",
-        )
-    if (
-        age is not None
-        and camera_session.age_in_years is not None
-        and abs(camera_session.age_in_years - age) > 1
-    ):
-        errors.append(
-            f"Age mismatch: expected ~{camera_session.age_in_years}, got {age}.",
-        )
-    if errors:
-        return {"valid": False, "code": "validation_mismatch", "errors": errors}
-    return {"valid": True, "code": "ok", "errors": []}
-
-
 def _validate_file_content(uploaded_file, file_type: str) -> str | None:
     """Basic magic-byte validation. Returns error message or None."""
+    if file_type in _DICOM_FILE_TYPES:
+        # DICOM: 128-byte preamble then "DICM"
+        head = uploaded_file.read(_DICOM_PREAMBLE_LEN + 4)
+        uploaded_file.seek(0)
+        if len(head) < _DICOM_PREAMBLE_LEN + 4:
+            return "File is too small to be a valid DICOM."
+        if head[_DICOM_PREAMBLE_LEN:] != _DICOM_MAGIC:
+            return "File does not appear to be a valid DICOM."
+        return None
     head = uploaded_file.read(256)
     uploaded_file.seek(0)
     if not head:
@@ -197,14 +171,14 @@ class PingView(APIView):
 
 
 class ResolveSubjectView(APIView):
-    """Resolve a subject identifier against an existing CameraSession.
+    """Confirm that a CameraSession exists for a subject.
 
     POST /api/retinopathy/resolve/
 
     A CameraSession must be created in the EDC by the clinician before
-    the camera exam. This endpoint finds the most recent incomplete
-    session for the subject, validates demographics from the camera's
-    local DB, and returns the camera_session_id for file uploads.
+    the camera exam.  This endpoint confirms that at least one eligible
+    (non-complete, non-contraindicated) session exists and returns its
+    ``camera_session_id``.
     """
 
     authentication_classes = (TokenAuthentication,)
@@ -220,7 +194,6 @@ class ResolveSubjectView(APIView):
         device_id = data.get("device_id", "")
 
         # --- Find the most recent eligible session ---
-        # Walk sessions newest-first; skip contraindicated and complete.
         qs: QuerySet[CameraSession] = CameraSession.objects.filter(
             subject_identifier=subject_identifier,
         ).order_by("-report_datetime")
@@ -235,7 +208,6 @@ class ResolveSubjectView(APIView):
             break
 
         if camera_session_obj is None:
-            # Distinguish "no camera_session_objs at all" from "all ineligible".
             if not qs.exists():
                 logger.warning(
                     "No camera session for %s (device=%s). "
@@ -246,11 +218,11 @@ class ResolveSubjectView(APIView):
                 return Response(
                     {
                         "code": "no_session",
-                        "errors": [
+                        "error": (
                             "No camera session found for this subject. "
                             "Create one in the EDC before conducting "
-                            "the exam.",
-                        ],
+                            "the exam."
+                        ),
                     },
                     status=status.HTTP_404_NOT_FOUND,
                 )
@@ -262,34 +234,12 @@ class ResolveSubjectView(APIView):
             return Response(
                 {
                     "code": "no_eligible_session",
-                    "errors": [
+                    "error": (
                         "All sessions for this subject are complete or "
                         "contraindicated. Create a new camera session in the "
-                        "EDC to upload again.",
-                    ],
+                        "EDC to upload again."
+                    ),
                 },
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        uploaded = set(camera_session_obj.files.values_list("file_type", flat=True))
-
-        # --- Validate demographics against session ---
-        result = _validate_subject_against_session(
-            camera_session=camera_session_obj,
-            initials=data["initials"],
-            sex=data["sex"],
-            age=data.get("age"),
-        )
-        if not result["valid"]:
-            logger.warning(
-                "Resolve failed for %s session=%s (device=%s): %s",
-                subject_identifier,
-                camera_session_obj.pk,
-                device_id,
-                "; ".join(result["errors"]),
-            )
-            return Response(
-                {"code": result["code"], "errors": result["errors"]},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -298,19 +248,23 @@ class ResolveSubjectView(APIView):
             camera_session_obj.device_id = device_id
             camera_session_obj.save(update_fields=["device_id"])
 
+        uploaded = sorted(
+            camera_session_obj.files.values_list("file_type", flat=True),
+        )
+
         logger.info(
             "Resolved session %s for %s (device=%s, uploaded=%s)",
             camera_session_obj.pk,
             subject_identifier,
             device_id,
-            sorted(uploaded),
+            uploaded,
         )
 
         return Response(
             {
                 "subject_identifier": camera_session_obj.subject_identifier,
                 "camera_session_id": camera_session_obj.pk,
-                "reactivated": bool(uploaded),
+                "uploaded": uploaded,
             },
             status=status.HTTP_200_OK,
         )
@@ -461,24 +415,25 @@ class FileUploadView(APIView):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
-        # --- Save new file atomically (before deleting old) ---
-        ext = Path(uploaded_file.name).suffix.lower() or (
-            ".pdf" if file_type == "report" else ".jpg"
+        # --- Save file under session subdirectory with original filename ---
+        session_dir = _get_storage_dir() / str(camera_session_obj.pk)
+        session_dir.mkdir(parents=True, exist_ok=True)
+        original_filename = uploaded_file.name
+        stored_filename = f"{camera_session_obj.pk}/{original_filename}"
+        dest = session_dir / original_filename
+
+        fd, tmp_path = tempfile.mkstemp(
+            dir=str(session_dir),
+            suffix=f".tmp{Path(original_filename).suffix.lower()}",
         )
-        stored_filename = f"{uuid.uuid4().hex}{ext}"
-        dest = _get_storage_dir() / stored_filename
-
-        dest.parent.mkdir(parents=True, exist_ok=True)
-
-        fd, tmp_path = tempfile.mkstemp(dir=str(dest.parent), suffix=f".tmp{ext}")
         try:
             with os.fdopen(fd, "wb") as out:
                 for chunk in uploaded_file.chunks():
                     out.write(chunk)
-            os.rename(tmp_path, str(dest))  # noqa: PTH104
+            Path(tmp_path).rename(dest)
         except OSError:
             with contextlib.suppress(OSError):
-                os.unlink(tmp_path)  # noqa: PTH108
+                Path(tmp_path).unlink()
             logger.exception(
                 "Failed to write %s for %s session=%s",
                 file_type,
@@ -492,25 +447,6 @@ class FileUploadView(APIView):
                 },
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
-
-        # --- Replace existing record if re-uploaded ---
-        existing = SessionFile.objects.filter(
-            camera_session=camera_session_obj,
-            file_type=file_type,
-        ).first()
-        if existing:
-            # Remove old file from disk (new file is already safely written)
-            old_path = _get_storage_dir() / existing.stored_filename
-            with contextlib.suppress(OSError):
-                old_path.unlink()
-            logger.info(
-                "Replacing %s for %s session=%s (old=%s)",
-                file_type,
-                subject_identifier,
-                camera_session_obj.pk,
-                existing.stored_filename,
-            )
-            existing.delete()
 
         # --- Compute SHA-256 of stored file (used for verification and response) ---
         stored_checksum = _compute_sha256(dest)

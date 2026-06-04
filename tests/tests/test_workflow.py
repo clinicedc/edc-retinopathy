@@ -84,7 +84,7 @@ class FullWorkflowTests(RetinopathyTestCaseMixin):
         # Step 1: Resolve
         resolve_data = self._resolve()
         self.assertEqual(resolve_data["camera_session_id"], session.pk)
-        self.assertFalse(resolve_data["reactivated"])
+        self.assertEqual(resolve_data["uploaded"], [])
 
         # Step 2: Left eye
         left_data = self._upload("105-10-0001-2", "left")
@@ -181,7 +181,7 @@ class FullWorkflowTests(RetinopathyTestCaseMixin):
         # Camera disconnects ... reconnects and resolves again
         r2 = self._resolve()
         self.assertEqual(r2["camera_session_id"], session.pk)
-        self.assertTrue(r2["reactivated"])
+        self.assertIn("left", r2["uploaded"])
 
         # Check status shows what was already uploaded
         status_resp = self.client.get(
@@ -198,14 +198,13 @@ class FullWorkflowTests(RetinopathyTestCaseMixin):
         )
         self.assertTrue(status_resp.data["complete"])
 
-    def test_workflow_retry_after_timeout(self) -> None:
-        """Camera retries an upload after a network timeout; replaces."""
+    def test_workflow_multiple_files_per_eye(self) -> None:
+        """Camera uploads multiple images for the same eye."""
         self.create_camera_session(self.rs)
         self._resolve()
 
-        # First upload
         f1 = SimpleUploadedFile(
-            "left.jpg",
+            "105-60-00224-7_Retina_OD_001.jpg",
             b"\xff\xd8\xff\xe0" + b"\x00" * 100,
             "image/jpeg",
         )
@@ -216,9 +215,8 @@ class FullWorkflowTests(RetinopathyTestCaseMixin):
         )
         self.assertEqual(resp1.status_code, 201)
 
-        # Camera thinks it failed, retries
         f2 = SimpleUploadedFile(
-            "left.jpg",
+            "105-60-00224-7_Retina_OD_002.jpg",
             b"\xff\xd8\xff\xe0" + b"\x00" * 100,
             "image/jpeg",
         )
@@ -228,8 +226,7 @@ class FullWorkflowTests(RetinopathyTestCaseMixin):
             format="multipart",
         )
         self.assertEqual(resp2.status_code, 201)
-        self.assertNotEqual(resp2.data["id"], resp1.data["id"])
-        self.assertEqual(SessionFile.objects.count(), 1)
+        self.assertEqual(SessionFile.objects.count(), 2)
 
     def test_workflow_complete_then_new_session_needed(self) -> None:
         """After completing, resolve returns no_eligible_session."""

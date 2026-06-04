@@ -48,6 +48,18 @@ def _make_pdf_file(name: str = "report.pdf", size: int = 2048) -> SimpleUploaded
     )
 
 
+def _make_dicom_file(name: str = "scan.dcm", size: int = 2048) -> SimpleUploadedFile:
+    """Create a minimal DICOM file (128-byte preamble + DICM magic)."""
+    preamble = b"\x00" * 128
+    magic = b"DICM"
+    padding = b"\x00" * (size - 132)
+    return SimpleUploadedFile(
+        name=name,
+        content=preamble + magic + padding,
+        content_type="application/dicom",
+    )
+
+
 def _make_invalid_file(name: str = "garbage.jpg", size: int = 512) -> SimpleUploadedFile:
     return SimpleUploadedFile(
         name=name,
@@ -111,7 +123,8 @@ class LeftEyeUploadTests(FileUploadBaseTestCase):
         self.assertTrue(stored_path.exists())
         self.assertGreater(stored_path.stat().st_size, 0)
 
-    def test_upload_left_eye_replacement(self) -> None:
+    def test_upload_multiple_left_eye_files(self) -> None:
+        """Multiple files with the same file_type are allowed."""
         resp1 = self.client.post(
             self._upload_url("left"),
             {"file": _make_image_file(), "capture_datetime": CAPTURE_DT},
@@ -127,9 +140,8 @@ class LeftEyeUploadTests(FileUploadBaseTestCase):
             format="multipart",
         )
         self.assertEqual(response.status_code, 201)
-        self.assertEqual(SessionFile.objects.count(), 1)
+        self.assertEqual(SessionFile.objects.count(), 2)
         self.assertEqual(response.data["file_type"], "left")
-        self.assertNotEqual(response.data["id"], resp1.data["id"])
 
 
 class RightEyeUploadTests(FileUploadBaseTestCase):
@@ -142,7 +154,7 @@ class RightEyeUploadTests(FileUploadBaseTestCase):
         self.assertEqual(response.status_code, 201)
         self.assertEqual(response.data["file_type"], "right")
 
-    def test_upload_right_eye_replacement(self) -> None:
+    def test_upload_multiple_right_eye_files(self) -> None:
         self.client.post(
             self._upload_url("right"),
             {"file": _make_image_file(), "capture_datetime": CAPTURE_DT},
@@ -150,11 +162,14 @@ class RightEyeUploadTests(FileUploadBaseTestCase):
         )
         response = self.client.post(
             self._upload_url("right"),
-            {"file": _make_image_file(), "capture_datetime": "2026-05-21T11:00:00Z"},
+            {
+                "file": _make_image_file(name="another.jpg"),
+                "capture_datetime": "2026-05-21T11:00:00Z",
+            },
             format="multipart",
         )
         self.assertEqual(response.status_code, 201)
-        self.assertEqual(SessionFile.objects.count(), 1)
+        self.assertEqual(SessionFile.objects.count(), 2)
 
 
 class ReportUploadTests(FileUploadBaseTestCase):
@@ -181,7 +196,7 @@ class ReportUploadTests(FileUploadBaseTestCase):
         self.assertTrue(img.stored_filename.endswith(".pdf"))
         self.assertEqual(img.file_content_type, "application/pdf")
 
-    def test_upload_report_replacement(self) -> None:
+    def test_upload_multiple_reports(self) -> None:
         self.client.post(
             self._upload_url("report"),
             {"file": _make_pdf_file(), "capture_datetime": CAPTURE_DT},
@@ -189,11 +204,14 @@ class ReportUploadTests(FileUploadBaseTestCase):
         )
         response = self.client.post(
             self._upload_url("report"),
-            {"file": _make_pdf_file(), "capture_datetime": "2026-05-21T11:00:00Z"},
+            {
+                "file": _make_pdf_file(name="report2.pdf"),
+                "capture_datetime": "2026-05-21T11:00:00Z",
+            },
             format="multipart",
         )
         self.assertEqual(response.status_code, 201)
-        self.assertEqual(SessionFile.objects.count(), 1)
+        self.assertEqual(SessionFile.objects.count(), 2)
 
 
 class ContentValidationTests(FileUploadBaseTestCase):
@@ -382,19 +400,21 @@ class FileUploadEdgeCaseTests(FileUploadBaseTestCase):
         self.assertEqual(img.camera_session, newer_camera_session)
         self.assertNotEqual(img.camera_session, self.camera_session)
 
-    def test_stored_filename_is_uuid_based(self) -> None:
+    def test_stored_filename_uses_original_name(self) -> None:
+        """Stored filename is <session_pk>/<original_filename>."""
         self.client.post(
             self._upload_url("left"),
             {
-                "file": _make_image_file(name="patient_scan_secret.jpg"),
+                "file": _make_image_file(name="fundus_OD_20260602.jpg"),
                 "capture_datetime": CAPTURE_DT,
             },
             format="multipart",
         )
         img = SessionFile.objects.get()
-        self.assertNotIn("patient", img.stored_filename)
-        self.assertNotIn("secret", img.stored_filename)
-        self.assertEqual(len(img.stored_filename), 36)  # 32 hex + '.jpg'
+        self.assertEqual(
+            img.stored_filename,
+            f"{self.camera_session.pk}/fundus_OD_20260602.jpg",
+        )
 
     def test_file_extension_preserved(self) -> None:
         self.client.post(
@@ -405,33 +425,27 @@ class FileUploadEdgeCaseTests(FileUploadBaseTestCase):
         img = SessionFile.objects.get()
         self.assertTrue(img.stored_filename.endswith(".png"))
 
-    def test_default_extension_for_report(self) -> None:
-        pdf = SimpleUploadedFile(
-            name="report",
-            content=b"%PDF-1.4" + b"\x00" * 100,
-            content_type="application/pdf",
-        )
+    def test_original_filename_preserved_for_report(self) -> None:
         self.client.post(
             self._upload_url("report"),
-            {"file": pdf, "capture_datetime": CAPTURE_DT},
+            {"file": _make_pdf_file(name="my_report.pdf"), "capture_datetime": CAPTURE_DT},
             format="multipart",
         )
-        img = SessionFile.objects.get()
-        self.assertTrue(img.stored_filename.endswith(".pdf"))
+        sf = SessionFile.objects.get()
+        self.assertEqual(sf.original_filename, "my_report.pdf")
+        self.assertTrue(sf.stored_filename.endswith("/my_report.pdf"))
 
-    def test_default_extension_for_image(self) -> None:
-        img_file = SimpleUploadedFile(
-            name="image",
-            content=b"\xff\xd8\xff\xe0" + b"\x00" * 100,
-            content_type="image/jpeg",
-        )
+    def test_original_filename_preserved_for_image(self) -> None:
         self.client.post(
             self._upload_url("left"),
-            {"file": img_file, "capture_datetime": CAPTURE_DT},
+            {
+                "file": _make_image_file(name="105-60-00224-7_Retina_OD.jpg"),
+                "capture_datetime": CAPTURE_DT,
+            },
             format="multipart",
         )
-        img = SessionFile.objects.get()
-        self.assertTrue(img.stored_filename.endswith(".jpg"))
+        sf = SessionFile.objects.get()
+        self.assertEqual(sf.original_filename, "105-60-00224-7_Retina_OD.jpg")
 
 
 class ChecksumTests(FileUploadBaseTestCase):
@@ -453,8 +467,6 @@ class ChecksumTests(FileUploadBaseTestCase):
 
     def test_wrong_checksum_rejected(self) -> None:
         content = b"\xff\xd8\xff\xe0" + b"\x00" * 100
-        storage = Path(settings.EDC_RETINOPATHY_STORAGE_DIR) / "images"
-        files_before = set(storage.iterdir())
         response = self.client.post(
             self._upload_url("left"),
             {
@@ -467,8 +479,17 @@ class ChecksumTests(FileUploadBaseTestCase):
         self.assertEqual(response.status_code, 400)
         self.assertEqual(response.data["code"], "checksum_mismatch")
         self.assertEqual(SessionFile.objects.count(), 0)
-        new_files = set(storage.iterdir()) - files_before
-        self.assertEqual(len(new_files), 0)
+        # File should have been cleaned up from disk
+        session_dir = (
+            Path(settings.EDC_RETINOPATHY_STORAGE_DIR)
+            / "images"
+            / str(self.camera_session.pk)
+        )
+        if session_dir.exists():
+            self.assertEqual(
+                [f for f in session_dir.iterdir() if not f.name.startswith(".")],
+                [],
+            )
 
     def test_checksum_is_optional(self) -> None:
         response = self.client.post(
@@ -542,3 +563,111 @@ class SessionIdParamTests(FileUploadBaseTestCase):
             format="multipart",
         )
         self.assertEqual(response.status_code, 201)
+
+
+class DicomUploadTests(FileUploadBaseTestCase):
+    def test_upload_left_dicom_success(self) -> None:
+        response = self.client.post(
+            self._upload_url("left_dicom"),
+            {"file": _make_dicom_file(), "capture_datetime": CAPTURE_DT},
+            format="multipart",
+        )
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.data["file_type"], "left_dicom")
+        self.assertEqual(SessionFile.objects.count(), 1)
+
+    def test_upload_right_dicom_success(self) -> None:
+        response = self.client.post(
+            self._upload_url("right_dicom"),
+            {"file": _make_dicom_file(), "capture_datetime": CAPTURE_DT},
+            format="multipart",
+        )
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.data["file_type"], "right_dicom")
+
+    def test_dicom_file_saved_to_disk(self) -> None:
+        self.client.post(
+            self._upload_url("left_dicom"),
+            {"file": _make_dicom_file(), "capture_datetime": CAPTURE_DT},
+            format="multipart",
+        )
+        sf = SessionFile.objects.get()
+        stored_path = (
+            Path(settings.EDC_RETINOPATHY_STORAGE_DIR) / "images" / sf.stored_filename
+        )
+        self.assertTrue(stored_path.exists())
+        self.assertTrue(sf.stored_filename.endswith(".dcm"))
+        self.assertEqual(sf.file_content_type, "application/dicom")
+
+    def test_dicom_multiple_files(self) -> None:
+        self.client.post(
+            self._upload_url("left_dicom"),
+            {"file": _make_dicom_file(), "capture_datetime": CAPTURE_DT},
+            format="multipart",
+        )
+        response = self.client.post(
+            self._upload_url("left_dicom"),
+            {
+                "file": _make_dicom_file(name="rescan.dcm"),
+                "capture_datetime": "2026-05-21T11:00:00Z",
+            },
+            format="multipart",
+        )
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(SessionFile.objects.count(), 2)
+
+    def test_invalid_dicom_rejected(self) -> None:
+        bad_dcm = SimpleUploadedFile(
+            name="bad.dcm",
+            content=b"NOT A DICOM FILE" + b"\x00" * 200,
+            content_type="application/dicom",
+        )
+        response = self.client.post(
+            self._upload_url("left_dicom"),
+            {"file": bad_dcm, "capture_datetime": CAPTURE_DT},
+            format="multipart",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.data["code"], "invalid_content")
+
+    def test_dicom_too_small_rejected(self) -> None:
+        tiny_dcm = SimpleUploadedFile(
+            name="tiny.dcm",
+            content=b"\x00" * 100,
+            content_type="application/dicom",
+        )
+        response = self.client.post(
+            self._upload_url("left_dicom"),
+            {"file": tiny_dcm, "capture_datetime": CAPTURE_DT},
+            format="multipart",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.data["code"], "invalid_content")
+
+    def test_dicom_original_filename_preserved(self) -> None:
+        """DICOM original filename is kept."""
+        self.client.post(
+            self._upload_url("left_dicom"),
+            {
+                "file": _make_dicom_file(name="105-60-00224-7_Retina_OD.dcm"),
+                "capture_datetime": CAPTURE_DT,
+            },
+            format="multipart",
+        )
+        sf = SessionFile.objects.get()
+        self.assertEqual(sf.original_filename, "105-60-00224-7_Retina_OD.dcm")
+
+    def test_dicom_does_not_affect_is_complete(self) -> None:
+        """DICOM uploads are supplementary — session completes without them."""
+        for ft in ("left", "right", "report"):
+            if ft == "report":
+                f = _make_pdf_file()
+            else:
+                f = _make_image_file(name=f"{ft}.jpg")
+            self.client.post(
+                self._upload_url(ft),
+                {"file": f, "capture_datetime": CAPTURE_DT},
+                format="multipart",
+            )
+        self.camera_session.refresh_from_db()
+        self.assertTrue(self.camera_session.is_complete)
