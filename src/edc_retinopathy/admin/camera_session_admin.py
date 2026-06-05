@@ -60,11 +60,12 @@ class CameraSessionAdmin(
                     "documentation only and do not block the session."
                 ),
                 "fields": (
+                    "pregnant",
+                    "self_reported_impairment",
                     "visual_impairment",
                     "retinal_conditions",
                     "ocular_interventions",
                     "photosensitive",
-                    "pregnant",
                 ),
             },
         ),
@@ -80,6 +81,9 @@ class CameraSessionAdmin(
         "photosensitive": admin.VERTICAL,
         "pregnant": admin.VERTICAL,
         "report_type": admin.VERTICAL,
+        "op_referral": admin.VERTICAL,
+        "may_contact": admin.VERTICAL,
+        "self_reported_impairment": admin.VERTICAL,
     }
 
     @admin.display(description="Files")

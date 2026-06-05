@@ -25,12 +25,13 @@ class ContactAttemptAdmin(
 
     list_display = (
         "subject_identifier",
-        "gender",
-        "initials",
         "report_datetime",
-        "number_of_attempts",
-        "contact_made",
-        "agreed_to_attend",
+        "initials",
+        "gender",
+        "attempts",
+        "contact",
+        "will_attend",
+        "appt_date",
         "created",
     )
     list_filter = (
@@ -58,7 +59,7 @@ class ContactAttemptAdmin(
                 "fields": (
                     "contact_made",
                     "agreed_to_attend",
-                    "agreed_to_attend_datetime",
+                    "agreed_to_attend_date",
                     "declined_reason",
                 ),
             },
@@ -70,3 +71,19 @@ class ContactAttemptAdmin(
         "contact_made": admin.VERTICAL,
         "agreed_to_attend": admin.VERTICAL,
     }
+
+    @admin.display(description="Attempts")
+    def attempts(self, obj: ContactAttempt):
+        return obj.number_of_attempts
+
+    @admin.display(description="Contact made")
+    def contact(self, obj: ContactAttempt):
+        return obj.contact_made
+
+    @admin.display(description="Agreed to attend")
+    def will_attend(self, obj: ContactAttempt):
+        return obj.agreed_to_attend
+
+    @admin.display(description="Appt date")
+    def appt_date(self, obj: ContactAttempt):
+        return obj.agreed_to_attend_date

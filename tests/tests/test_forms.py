@@ -9,6 +9,7 @@ from clinicedc_constants import NO, NOT_APPLICABLE, OTHER, YES
 from django import forms
 from django.test import TestCase
 from django.utils import timezone
+
 from edc_retinopathy.forms.contact_attempt_form import ContactAttemptValidator
 from edc_retinopathy.forms.referral_followup_form import ReferralFollowupValidator
 from edc_retinopathy.models import (
@@ -32,13 +33,14 @@ class ContactAttemptFormTests(RetinopathyTestCaseMixin):
             "number_of_attempts": 1,
             "contact_made": YES,
             "agreed_to_attend": YES,
-            "agreed_to_attend_datetime": timezone.now().date(),
+            "agreed_to_attend_date": timezone.now().date(),
             "declined_reason": "",
         }
 
     def _validate(self, data: dict) -> dict:
         form = ContactAttemptValidator(
-            cleaned_data=data, model=ContactAttempt,
+            cleaned_data=data,
+            model=ContactAttempt,
         )
         with contextlib.suppress(forms.ValidationError):
             form.validate()
@@ -57,17 +59,17 @@ class ContactAttemptFormTests(RetinopathyTestCaseMixin):
         self.assertIn("agreed_to_attend", errors)
 
     def test_agreed_to_attend_requires_datetime(self) -> None:
-        """If agreed_to_attend=YES, agreed_to_attend_datetime is required."""
+        """If agreed_to_attend=YES, agreed_to_attend_date is required."""
         data = deepcopy(self.data)
-        data["agreed_to_attend_datetime"] = None
+        data["agreed_to_attend_date"] = None
         errors = self._validate(data)
-        self.assertIn("agreed_to_attend_datetime", errors)
+        self.assertIn("agreed_to_attend_date", errors)
 
     def test_declined_requires_reason(self) -> None:
         """If agreed_to_attend=NO, declined_reason is required."""
         data = deepcopy(self.data)
         data["agreed_to_attend"] = NO
-        data["agreed_to_attend_datetime"] = None
+        data["agreed_to_attend_date"] = None
         data["declined_reason"] = ""
         errors = self._validate(data)
         self.assertIn("declined_reason", errors)
@@ -76,17 +78,17 @@ class ContactAttemptFormTests(RetinopathyTestCaseMixin):
         """Declined with a reason is valid."""
         data = deepcopy(self.data)
         data["agreed_to_attend"] = NO
-        data["agreed_to_attend_datetime"] = None
+        data["agreed_to_attend_date"] = None
         data["declined_reason"] = "Unable to travel"
         errors = self._validate(data)
         self.assertEqual(errors, {})
 
     def test_no_contact_made(self) -> None:
-        """No contact made — agreed_to_attend not required."""
+        """No contact made — agreed_to_attend must be not applicable."""
         data = deepcopy(self.data)
         data["contact_made"] = NO
-        data["agreed_to_attend"] = ""
-        data["agreed_to_attend_datetime"] = None
+        data["agreed_to_attend"] = NOT_APPLICABLE
+        data["agreed_to_attend_date"] = None
         data["declined_reason"] = ""
         errors = self._validate(data)
         self.assertEqual(errors, {})
@@ -126,7 +128,8 @@ class ReferralFollowupFormTests(RetinopathyTestCaseMixin):
 
     def _validate(self, data: dict) -> dict:
         form = ReferralFollowupValidator(
-            cleaned_data=data, model=ReferralFollowup,
+            cleaned_data=data,
+            model=ReferralFollowup,
         )
         with contextlib.suppress(forms.ValidationError):
             form.validate()
