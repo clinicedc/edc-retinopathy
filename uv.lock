@@ -583,8 +583,8 @@ wheels = [
 
 [[package]]
 name = "clinicedc"
-version = "4.0.5"
-source = { editable = "../clinicedc" }
+version = "4.0.6"
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "argon2-cffi" },
     { name = "arrow" },
@@ -630,90 +630,24 @@ dependencies = [
     { name = "tqdm" },
     { name = "twilio" },
 ]
-
-[package.metadata]
-requires-dist = [
-    { name = "argon2-cffi", specifier = ">=25.1.0" },
-    { name = "arrow", specifier = ">=1.3.0" },
-    { name = "beautifulsoup4", specifier = ">=4.13.5" },
-    { name = "boto3", specifier = ">=1.39.16" },
-    { name = "celery", specifier = ">=5.5.3" },
-    { name = "clinicedc-constants", editable = "../clinicedc-constants" },
-    { name = "clinicedc-utils", editable = "../clinicedc-utils" },
-    { name = "cryptography", specifier = ">=45.0.7" },
-    { name = "django", specifier = ">=5.2,<6.1" },
-    { name = "django-admin-rangefilter", specifier = ">=0.13.3" },
-    { name = "django-audit-fields", specifier = ">=2.0.6" },
-    { name = "django-crypto-fields", specifier = ">=1.2.0" },
-    { name = "django-db-views", specifier = ">=0.1.11" },
-    { name = "django-defender", specifier = ">=0.9.8" },
-    { name = "django-environ", specifier = ">=0.12.0" },
-    { name = "django-import-export", specifier = ">=4.3.0" },
-    { name = "django-logentry-admin", specifier = ">=1.1.0" },
-    { name = "django-multisite2", specifier = ">=2.1.0" },
-    { name = "django-pandas", specifier = ">=0.6.7" },
-    { name = "django-pylabels", specifier = ">=1.0.1" },
-    { name = "django-redis", specifier = ">=6.0.0" },
-    { name = "django-revision", specifier = ">=2.1.0" },
-    { name = "django-sequences", specifier = ">=3.0" },
-    { name = "django-simple-history", specifier = ">=3.10.1" },
-    { name = "django-storages", specifier = ">=1.14.6" },
-    { name = "djangorestframework", specifier = ">=3.16.0" },
-    { name = "fontawesomefree", specifier = ">=6.6.0" },
-    { name = "gunicorn", specifier = ">=23.0.0" },
-    { name = "inflect", specifier = ">=7.5.0" },
-    { name = "mempass", specifier = ">=0.1.2" },
-    { name = "mysqlclient", specifier = ">=2.2.7" },
-    { name = "parse-trial-labs", specifier = ">=0.4.0" },
-    { name = "psycopg2", specifier = ">=2.9.10" },
-    { name = "pycups", specifier = ">=2.0.4" },
-    { name = "pypdf", specifier = ">=5.9.0" },
-    { name = "python-dateutil", specifier = ">=2.9.0.post0" },
-    { name = "python-memcached", specifier = ">=1.62" },
-    { name = "reportlab", specifier = ">=4.4.3" },
-    { name = "sqlalchemy", specifier = ">=2.0.42" },
-    { name = "sqlglot", specifier = ">=27.8.0" },
-    { name = "tabulate", specifier = ">=0.9.0" },
-    { name = "tqdm", specifier = ">=4.67.1" },
-    { name = "twilio", specifier = ">=9.7.0" },
-]
-
-[package.metadata.requires-dev]
-dev = [
-    { name = "clinicedc-tests", editable = "../clinicedc-tests" },
-    { name = "django-webtest", specifier = ">=1.9.14" },
-]
-docs = [
-    { name = "furo", specifier = ">=2025.7.19" },
-    { name = "sphinx", specifier = ">=8.2.3" },
-    { name = "sphinx-design", specifier = ">=0.6.1" },
-    { name = "sphinx-inline-tabs", specifier = ">=2023.4.21" },
-    { name = "sphinx-rtd-theme", specifier = ">=3.0.2" },
-]
-lint = [{ name = "ruff", specifier = ">=0.13.2" }]
-notebook = [
-    { name = "dj-notebook", specifier = ">=0.7.0" },
-    { name = "great-tables", specifier = ">=0.18.0" },
-    { name = "matplotlib", specifier = ">=3.10.3" },
-    { name = "matplotlib-venn", specifier = ">=1.1.2" },
-    { name = "numpy", specifier = ">=2.3.2" },
-    { name = "pandas", specifier = ">=2.3.1" },
-    { name = "pdfkit", specifier = ">=1.0.0" },
-    { name = "scikit-learn", specifier = ">=1.7.1" },
-    { name = "scipy", specifier = ">=1.16.0" },
-    { name = "selenium", specifier = ">=4.34.2" },
-    { name = "tabulate", specifier = ">=0.9.0" },
+sdist = { url = "https://files.pythonhosted.org/packages/25/67/53ce6927e682def046f8cb128e41f5ddcb35b9bbe5c04781af81fb349df9/clinicedc-4.0.6.tar.gz", hash = "sha256:0b3acabceaf9cecd3dee8701168e8716ae81991afc9eb54eb3d12c444314bcd8", size = 1475185, upload-time = "2026-06-05T15:12:45.684Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/3c/c7/25cd7da5e8a79f795d158e75cd155650d82c8c31efcd17829193b7fe4d55/clinicedc-4.0.6-py3-none-any.whl", hash = "sha256:b29eb7893febdaa5e5f78d6043d6454f00fbcae9b01e1a179b45ad6ed16e9e02", size = 2967416, upload-time = "2026-06-05T15:12:43.523Z" },
 ]
 
 [[package]]
 name = "clinicedc-constants"
 version = "1.5.0"
-source = { editable = "../clinicedc-constants" }
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/25/17/2a738f89ba1f81cf78007dcf52af975fdc125374d555c1643d8526a52fc8/clinicedc_constants-1.5.0.tar.gz", hash = "sha256:31bb3d93aa61ec610a3d76a37e6ce6f35a937ecae2f74daf56a0e9d0aeaa8b8c", size = 11378, upload-time = "2026-05-21T02:06:42.755Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/42/3b/575d2f5c7a938b49c037575f4971a22cbaf2bf7878d5d384b6870bc73fa6/clinicedc_constants-1.5.0-py3-none-any.whl", hash = "sha256:c43f21bdedcfc7b97d97438e6bbdd8d990e71c07b23fd83355db332a0fc5ca22", size = 13538, upload-time = "2026-05-21T02:06:41.337Z" },
+]
 
 [[package]]
 name = "clinicedc-tests"
 version = "1.2.2"
-source = { editable = "../clinicedc-tests" }
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "coverage" },
     { name = "django-mock-queries" },
@@ -723,32 +657,15 @@ dependencies = [
     { name = "tox" },
     { name = "tox-uv" },
 ]
-
-[package.metadata]
-requires-dist = [
-    { name = "coverage", specifier = ">=7.13.5" },
-    { name = "django-mock-queries", specifier = ">=2.3.0" },
-    { name = "faker", specifier = ">=37.4.2" },
-    { name = "model-bakery", specifier = ">=1.20.5" },
-    { name = "time-machine", specifier = ">=2.16.0" },
-    { name = "tox", specifier = ">=4.32.0" },
-    { name = "tox-uv", specifier = ">=1.26.2" },
+sdist = { url = "https://files.pythonhosted.org/packages/9d/92/f3d98fcbdf71a971a3a5820564196aa1e532234111f110d1628400e566d9/clinicedc_tests-1.2.2.tar.gz", hash = "sha256:777c3fb5654a23064736f1e65f3d039ca3eb6937bf177463cc5c923d7eeee89f", size = 55708, upload-time = "2026-04-19T20:55:44.039Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/21/7b/78e305c6de030c45002389877212618b3ded8410104db5f23c26eb1c1979/clinicedc_tests-1.2.2-py3-none-any.whl", hash = "sha256:e1c9e6d059af22d9ab7784a648084b416b5e5a5bb78b32eec5d05e0b8f1954f7", size = 98118, upload-time = "2026-04-19T20:55:42.74Z" },
 ]
-
-[package.metadata.requires-dev]
-dev = []
-docs = [
-    { name = "furo", specifier = ">=2025.7.19" },
-    { name = "sphinx", specifier = ">=8.2.3" },
-    { name = "sphinx-design", specifier = ">=0.6.1" },
-    { name = "sphinx-inline-tabs", specifier = ">=2023.4.21" },
-]
-lint = [{ name = "ruff", specifier = ">=0.12.5" }]
 
 [[package]]
 name = "clinicedc-utils"
 version = "1.0.4"
-source = { editable = "../clinicedc-utils" }
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "clinicedc-constants" },
     { name = "pandas" },
@@ -756,14 +673,9 @@ dependencies = [
     { name = "sqlalchemy" },
     { name = "tqdm" },
 ]
-
-[package.metadata]
-requires-dist = [
-    { name = "clinicedc-constants", specifier = ">=1.0.1" },
-    { name = "pandas", specifier = ">=2.3.3" },
-    { name = "remote-read-sql", specifier = ">=1.4.0" },
-    { name = "sqlalchemy", specifier = ">=2.0.44" },
-    { name = "tqdm", specifier = ">=4.67.1" },
+sdist = { url = "https://files.pythonhosted.org/packages/95/82/b6836a1538635e3a52717528b843b7689b5e4ff430755085110a11ba3410/clinicedc_utils-1.0.4.tar.gz", hash = "sha256:ade9a69592a1dda1467c0a102f93bb5c2f8aaed42554d7a08ecbb591c8ae45a2", size = 8886, upload-time = "2026-06-02T23:07:33.854Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/60/65/2726eb0d02b2faef39a9d23c9b8ea746f1900d8594d4d6609b17e9c8f61e/clinicedc_utils-1.0.4-py3-none-any.whl", hash = "sha256:8068e57c6f30fee6e1a89b06f9ab12f77bf75995c245dfad953b7feee8750a5f", size = 20542, upload-time = "2026-06-02T23:07:34.744Z" },
 ]
 
 [[package]]
@@ -1243,6 +1155,8 @@ dependencies = [
     { name = "django" },
     { name = "djangorestframework" },
     { name = "djangorestframework-stubs" },
+    { name = "pillow" },
+    { name = "pydicom" },
     { name = "ruff" },
     { name = "watchdog" },
 ]
@@ -1256,17 +1170,19 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "clinicedc", editable = "../clinicedc" },
+    { name = "clinicedc", specifier = ">=4.0.0" },
     { name = "django", specifier = ">=5.2,<6.1" },
     { name = "djangorestframework", specifier = ">=3.16.0" },
     { name = "djangorestframework-stubs", specifier = ">=3.17.0" },
+    { name = "pillow", specifier = ">=11.0" },
+    { name = "pydicom", specifier = ">=3.0" },
     { name = "ruff", specifier = ">=0.15.15" },
     { name = "watchdog", specifier = ">=6.0.0" },
 ]
 
 [package.metadata.requires-dev]
 dev = [
-    { name = "clinicedc-tests", editable = "../clinicedc-tests" },
+    { name = "clinicedc-tests", specifier = ">=1.2.2" },
     { name = "ruff", specifier = ">=0.15.15" },
     { name = "sphinx", specifier = ">=9.1.0" },
 ]
@@ -2174,6 +2090,15 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/96/c4/b077f0422cd031e4f3a47c75ce0bcf77f2f2e5bf3648f6945a4d09fd44a5/pycups-2.0.4.tar.gz", hash = "sha256:843e385c1dbf694996ca84ef02a7f30c28376035588f5fbeacd6bae005cf7c8d", size = 65105, upload-time = "2024-04-18T06:20:40.589Z" }
 
 [[package]]
+name = "pydicom"
+version = "3.0.2"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/7a/de/52aaf905f1f0ae7aba85996e2592ea2c1fe49157f3cfbcd1871965bdb51d/pydicom-3.0.2.tar.gz", hash = "sha256:5942bfc2d72c6fa4b3b5b62c527f54b7f2355f21d6f5d296df6bb30188df6a4f", size = 2886792, upload-time = "2026-03-19T21:46:20.935Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/46/e0/60466c6d712dad2cf807df315e39863e91609ffd1064ecb835994460bbda/pydicom-3.0.2-py3-none-any.whl", hash = "sha256:abf971a5440f84dbaf42c4b6758e30e62480902584f8b270b9a5d146e278a07b", size = 2376822, upload-time = "2026-03-19T21:46:19.042Z" },
+]
+
+[[package]]
 name = "pygments"
 version = "2.20.0"
 source = { registry = "https://pypi.org/simple" }
@@ -2240,11 +2165,11 @@ wheels = [
 
 [[package]]
 name = "pypdf"
-version = "6.12.2"
+version = "6.13.0"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/0a/6d/20879428577c1e57ecd41b69dc86beabf43db9287ad2e702207f8b48c751/pypdf-6.12.2.tar.gz", hash = "sha256:111669eb6680c04495ae0c113a1476e3bf93a95761d23c7406b591c80a6490b1", size = 6468184, upload-time = "2026-05-26T13:31:26.911Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/70/79/9fd087fbff8300e5c2a9b2bd0200b75c6ef8c1f9a7a2cfe3df0659aa4025/pypdf-6.13.0.tar.gz", hash = "sha256:558683ec9daf6b91c280c322c84c32f5cc216afd3eaa3a37de5ae88ae0c3b787", size = 6476995, upload-time = "2026-06-05T10:12:05.568Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/9e/44/fee070a16639d9869bb6a7e0f3a1b3946da1d66f32b9260b4d19cb90d7b2/pypdf-6.12.2-py3-none-any.whl", hash = "sha256:67b2699357a1f3f4c945940ea80826349ee507c9e2577724a14b4941982c104d", size = 343865, upload-time = "2026-05-26T13:31:25.068Z" },
+    { url = "https://files.pythonhosted.org/packages/9d/70/16942ec95d32187d8679ce8419cee2d5c0dbe90fa3ac1b307daea4c86da9/pypdf-6.13.0-py3-none-any.whl", hash = "sha256:de1294ae49d6956edb4e5c41527fb9e8716ddd2b120f2185c68aab784d4ffe60", size = 345958, upload-time = "2026-06-05T10:12:03.453Z" },
 ]
 
 [[package]]
@@ -2786,14 +2711,14 @@ wheels = [
 
 [[package]]
 name = "tqdm"
-version = "4.67.3"
+version = "4.68.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "colorama", marker = "sys_platform == 'win32'" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/09/a9/6ba95a270c6f1fbcd8dac228323f2777d886cb206987444e4bce66338dd4/tqdm-4.67.3.tar.gz", hash = "sha256:7d825f03f89244ef73f1d4ce193cb1774a8179fd96f31d7e1dcde62092b960bb", size = 169598, upload-time = "2026-02-03T17:35:53.048Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/06/b3/36c8ecf72e8925200671613332db156d84b99b3aee742a41c1938ebb0808/tqdm-4.68.1.tar.gz", hash = "sha256:fc163d96b287bd031e1aa24421ce4411b25559bd0a1be4fe649bdaa4d2c02bf5", size = 171236, upload-time = "2026-06-05T17:23:15.267Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/16/e1/3079a9ff9b8e11b846c6ac5c8b5bfb7ff225eee721825310c91b3b50304f/tqdm-4.67.3-py3-none-any.whl", hash = "sha256:ee1e4c0e59148062281c49d80b25b67771a127c85fc9676d3be5f243206826bf", size = 78374, upload-time = "2026-02-03T17:35:50.982Z" },
+    { url = "https://files.pythonhosted.org/packages/47/aa/218a0eb34de1f753c83e4d0d1c8e7c4cef27f20dcb8342e024f63a80dc86/tqdm-4.68.1-py3-none-any.whl", hash = "sha256:fea4a90e4023f764914569f7802a297277c5ab1a66be5144143e142e1a4031d8", size = 78354, upload-time = "2026-06-05T17:23:13.654Z" },
 ]
 
 [[package]]
