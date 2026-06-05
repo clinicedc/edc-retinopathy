@@ -470,15 +470,23 @@ class FileUploadView(APIView):
             checksum=stored_checksum,
         )
 
-        # --- Generate JPEG preview for DICOM files ---
+        # --- Generate JPEG preview for DICOM files (best effort) ---
         if file_type in _DICOM_FILE_TYPES:
-            preview_name = f"{dest.stem}_preview.jpg"
-            preview_path = dest.parent / "previews" / preview_name
-            if convert_dicom_to_jpeg(dest, preview_path):
-                session_file.preview_filename = (
-                    f"{camera_session_obj.pk}/previews/{preview_name}"
+            try:
+                preview_name = f"{dest.stem}_preview.jpg"
+                preview_path = dest.parent / "previews" / preview_name
+                if convert_dicom_to_jpeg(dest, preview_path):
+                    session_file.preview_filename = (
+                        f"{camera_session_obj.pk}/previews/{preview_name}"
+                    )
+                    session_file.save(update_fields=["preview_filename"])
+            except Exception:  # noqa: BLE001
+                logger.exception(
+                    "DICOM preview generation failed for %s session=%s — "
+                    "upload accepted without preview",
+                    subject_identifier,
+                    camera_session_obj.pk,
                 )
-                session_file.save(update_fields=["preview_filename"])
 
         logger.info(
             "Received %s for %s session=%s (%s bytes, stored=%s)",
