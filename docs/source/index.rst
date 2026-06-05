@@ -1,19 +1,16 @@
-.. edc retinopathy documentation master file, created by
-   sphinx-quickstart on Wed May 20 13:47:53 2026.
-   You can adapt this file completely to your liking, but it should at least
-   contain the root `toctree` directive.
+edc-retinopathy
+===============
 
-edc retinopathy documentation
-=============================
+``edc-retinopathy`` adds a diabetic retinopathy screening form and REST
+API for integrating a fundus camera with a clinicedc project.
 
-Add your content using ``reStructuredText`` syntax. See the
-`reStructuredText <https://www.sphinx-doc.org/en/master/usage/restructuredtext/index.html>`_
-documentation for details.
-
+A clinician creates a **CameraSession** in the EDC before the exam.  The
+camera software (``fundus-camera-watchdog``) resolves the subject against
+the server, uploads eye images, DICOM files, and reports, then checks
+session status.
 
 .. toctree::
    :maxdepth: 2
    :caption: Contents:
 
    api
-

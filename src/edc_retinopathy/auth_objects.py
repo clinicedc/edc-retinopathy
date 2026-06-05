@@ -12,10 +12,12 @@ for model_cls in app_config.get_models():
     if (
         "historical" not in model_cls._meta.label_lower
         and "registeredsubjectproxy" not in model_cls._meta.label_lower
+        and "missedreferralreasons" not in model_cls._meta.label_lower
     ):
         for action in ["view_", "add_", "change_", "delete_", "view_historical"]:
             codename = f".{action}".join(model_cls._meta.label_lower.split("."))
             codenames.append(codename)
 
 codenames.append(f"{EDC_RETINOPATHY}.view_registeredsubjectproxy")
+codenames.append(f"{EDC_RETINOPATHY}.view_missedreferralreasons")
 codenames.sort()

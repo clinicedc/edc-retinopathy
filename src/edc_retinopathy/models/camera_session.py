@@ -1,12 +1,9 @@
 from __future__ import annotations
 
-from clinicedc_constants import NOT_APPLICABLE, YES
-from clinicedc_constants.choices import GENDER, YES_NO, YES_NO_NA
-from dateutil.relativedelta import relativedelta
+from clinicedc_constants import NOT_APPLICABLE, NULL_STRING, YES
+from clinicedc_constants.choices import YES_NO_NA, YES_NO_NOT_EVALUATED
 from django.db import models
 from django.utils import timezone
-from django_crypto_fields.fields import EncryptedCharField
-from edc_identifier.model_mixins import NonUniqueSubjectIdentifierFieldMixin
 from edc_model.models import BaseUuidModel, HistoricalRecords
 from edc_prn.prn_model_manager import PrnModelManager
 from edc_sites.managers import CurrentSiteManager
@@ -22,25 +19,24 @@ from ..constants import (
     RIGHT_EYE,
     RIGHT_REPORT,
 )
+from .model_mixins import IdentityModelMixin
 from .registered_subject_proxy import RegisteredSubjectProxy
 
 
 class CameraSession(
-    SiteModelMixin, NonUniqueSubjectIdentifierFieldMixin, BaseUuidModel,
+    SiteModelMixin,
+    IdentityModelMixin,
+    BaseUuidModel,
 ):
-    """Represents a single retinopathy camera session for a subject.
+    """Represents a single retinopathy exam for a subject.
 
-    Completed by the user before the exam.
+    Completed by the clinic staff before the exam.
     """
 
     registered_subject = models.ForeignKey(
-        RegisteredSubjectProxy, on_delete=models.PROTECT,
+        RegisteredSubjectProxy,
+        on_delete=models.PROTECT,
     )
-
-    subject_identifier = models.CharField(max_length=50, null=True, editable=False)
-    initials = EncryptedCharField(null=True, editable=False)
-    age_in_years = models.IntegerField(null=True, editable=False)
-    gender = models.CharField(max_length=10, choices=GENDER, null=True, editable=False)
 
     report_datetime = models.DateTimeField(default=timezone.now)
 
@@ -58,19 +54,36 @@ class CameraSession(
         default=REPORT_TYPE_COMBINED,
     )
 
+    pregnant = models.CharField(
+        verbose_name="Is the patient pregnant?",
+        max_length=25,
+        choices=YES_NO_NA,
+        help_text="Not applicable for male patients.",
+    )
+
+    self_reported_impairment = models.CharField(
+        verbose_name=(
+            "Has the subject reported any issue with their "
+            "eyes making them ineligible for retinopathy screening"
+        ),
+        max_length=15,
+        choices=YES_NO_NOT_EVALUATED,
+        help_text="Self-reported",
+    )
+
     visual_impairment = models.CharField(
         verbose_name=(
             "Does the patient have persistent visual impairment in one or both eyes?"
         ),
         max_length=25,
-        choices=YES_NO,
+        choices=YES_NO_NOT_EVALUATED,
         help_text="Self-reported or diagnosed.",
     )
 
     retinal_conditions = models.CharField(
         verbose_name="Does the patient have pre-existing retinal conditions?",
         max_length=25,
-        choices=YES_NO,
+        choices=YES_NO_NOT_EVALUATED,
         help_text=(
             "Such as macular edema, retinal vascular occlusion, "
             "or any form of retinopathy not related to diabetes."
@@ -80,7 +93,7 @@ class CameraSession(
     ocular_interventions = models.CharField(
         verbose_name="Does the patient have a history of ocular interventions?",
         max_length=25,
-        choices=YES_NO,
+        choices=YES_NO_NOT_EVALUATED,
         help_text=(
             "Including retinal laser treatment, intravitreal injections, "
             "or intraocular surgeries (excluding uncomplicated cataract surgery)."
@@ -89,39 +102,45 @@ class CameraSession(
 
     photosensitive = models.CharField(
         verbose_name=(
-            "Is the patient photosensitive or otherwise "
-            "contraindicated for retinal imaging?"
+            "Is the patient photosensitive or otherwise contraindicated for retinal imaging?"
         ),
         max_length=25,
-        choices=YES_NO,
+        choices=YES_NO_NOT_EVALUATED,
     )
 
-    pregnant = models.CharField(
-        verbose_name="Is the patient pregnant?",
-        max_length=25,
+    op_comment = models.TextField(
+        verbose_name="Ophthalmologist's comment", default=NULL_STRING
+    )
+
+    op_referral = models.CharField(
+        verbose_name="Has the Ophthalmologist referred the subject for follow-up care?",
+        choices=YES_NO_NA,
+        max_length=15,
+        default=NOT_APPLICABLE,
+    )
+
+    referred_to = models.CharField(
+        verbose_name="If referred, name of facility subject referred",
+        max_length=200,
+        blank=True,
+    )
+
+    referred_date = models.DateField(
+        verbose_name="If referred, date of referral",
+        null=True,
+        blank=True,
+    )
+
+    may_contact = models.CharField(
+        verbose_name="If referred, may we contact the patient to followup on the referral?",
+        max_length=15,
         choices=YES_NO_NA,
         default=NOT_APPLICABLE,
-        help_text="Not applicable for male patients.",
     )
 
     objects = PrnModelManager()
     on_site = CurrentSiteManager()
     history = HistoricalRecords(inherit=True)
-
-    def __str__(self):
-        return str(self.registered_subject)
-
-    def save(self, *args, **kwargs):
-        self.subject_identifier = self.registered_subject.subject_identifier
-        self.gender = self.registered_subject.gender
-        self.initials = self.registered_subject.initials
-        self.age_in_years = abs(
-            relativedelta(timezone.now().date(), self.registered_subject.dob).years,
-        )
-        return super().save(*args, **kwargs)
-
-    def natural_key(self):
-        return (self.registered_subject.subject_identifier,)
 
     @property
     def expected_file_types(self) -> frozenset[str]:
