@@ -277,43 +277,6 @@ class FileSizeLimitTests(FileUploadBaseTestCase):
         self.assertEqual(response.status_code, 201)
 
 
-class SessionExpiryTests(FileUploadBaseTestCase):
-    @override_settings(EDC_RETINOPATHY_SESSION_EXPIRE_MINUTES=30)
-    def test_expired_session_not_found(self) -> None:
-        old_time = timezone.now() - timedelta(minutes=60)
-        CameraSession.objects.filter(pk=self.camera_session.pk).update(
-            report_datetime=old_time,
-        )
-        response = self.client.post(
-            self._upload_url("left"),
-            {"file": _make_image_file(), "capture_datetime": CAPTURE_DT},
-            format="multipart",
-        )
-        self.assertEqual(response.status_code, 404)
-        self.assertEqual(response.data["code"], "no_session")
-
-    def test_fresh_session_accepted(self) -> None:
-        response = self.client.post(
-            self._upload_url("left"),
-            {"file": _make_image_file(), "capture_datetime": CAPTURE_DT},
-            format="multipart",
-        )
-        self.assertEqual(response.status_code, 201)
-
-    @override_settings(EDC_RETINOPATHY_SESSION_EXPIRE_MINUTES=120)
-    def test_custom_expiry_setting(self) -> None:
-        old_time = timezone.now() - timedelta(minutes=90)
-        CameraSession.objects.filter(pk=self.camera_session.pk).update(
-            report_datetime=old_time,
-        )
-        response = self.client.post(
-            self._upload_url("left"),
-            {"file": _make_image_file(), "capture_datetime": CAPTURE_DT},
-            format="multipart",
-        )
-        self.assertEqual(response.status_code, 201)
-
-
 class CaptureDateTimeTests(FileUploadBaseTestCase):
     def test_capture_datetime_stored(self) -> None:
         response = self.client.post(

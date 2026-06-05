@@ -268,7 +268,7 @@ Query parameters
 
 ``camera_session_id`` (optional)
     Target a specific session instead of the most recent one.  Useful
-    after reconnection.  Bypasses the session expiry window.
+    after reconnection.
 
 Success response (201)
 ^^^^^^^^^^^^^^^^^^^^^^
@@ -314,7 +314,7 @@ Error Codes
      - Meaning
    * - ``no_session``
      - 404
-     - No CameraSession found for this subject, or session expired.
+     - No CameraSession found for this subject.
    * - ``no_eligible_session``
      - 400
      - Sessions exist but all are complete or contraindicated.
@@ -495,9 +495,6 @@ Optional settings:
 
    # Maximum upload file size in MB (default: 10)
    EDC_RETINOPATHY_MAX_FILE_SIZE_MB = 10
-
-   # Session expiry in minutes (default: 120)
-   EDC_RETINOPATHY_SESSION_EXPIRE_MINUTES = 120
 
 
 Example: Full Workflow

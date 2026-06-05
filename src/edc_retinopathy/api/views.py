@@ -5,12 +5,10 @@ import hashlib
 import logging
 import os
 import tempfile
-from datetime import timedelta
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 from django.conf import settings
-from django.utils import timezone
 from rest_framework import status
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
@@ -19,6 +17,7 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from ..dicom_preview import convert_dicom_to_jpeg
 from ..models import CameraSession, SessionFile
 from .serializers import FileUploadSerializer, ResolveSubjectSerializer
 
@@ -43,9 +42,6 @@ _DICOM_FILE_TYPES = frozenset({"left_dicom", "right_dicom"})
 
 # Default settings
 _DEFAULT_MAX_FILE_SIZE_MB = 10
-_DEFAULT_SESSION_EXPIRE_MINUTES = 120
-
-
 def _get_max_file_size_bytes() -> int:
     mb = getattr(
         settings,
@@ -53,16 +49,6 @@ def _get_max_file_size_bytes() -> int:
         _DEFAULT_MAX_FILE_SIZE_MB,
     )
     return int(mb * 1024 * 1024)
-
-
-def _get_session_expire_minutes() -> int:
-    return int(
-        getattr(
-            settings,
-            "EDC_RETINOPATHY_SESSION_EXPIRE_MINUTES",
-            _DEFAULT_SESSION_EXPIRE_MINUTES,
-        ),
-    )
 
 
 def _get_storage_dir() -> Path:
@@ -123,23 +109,19 @@ def _find_camera_session(
     subject_identifier: str,
     camera_session_id: str | None = None,
 ) -> CameraSession | None:
-    """Find an active session by subject_identifier.
+    """Find a session by subject_identifier.
 
-    If camera_session_id is provided, look up that specific session (no expiry
-    check — the caller explicitly chose it). Otherwise find the most
-    recent non-expired session.
+    If camera_session_id is provided, look up that specific session.
+    Otherwise find the most recent session for the subject.
     """
     if camera_session_id is not None:
         return CameraSession.objects.filter(
             pk=camera_session_id,
             subject_identifier=subject_identifier,
         ).first()
-    expire_minutes = _get_session_expire_minutes()
-    cutoff = timezone.now() - timedelta(minutes=expire_minutes)
     return (
         CameraSession.objects.filter(
             subject_identifier=subject_identifier,
-            report_datetime__gte=cutoff,
         )
         .order_by("-report_datetime")
         .first()
@@ -402,14 +384,16 @@ class FileUploadView(APIView):
             camera_session_id=camera_session_id,
         )
         if not camera_session_obj:
-            expire_minutes = _get_session_expire_minutes()
-            error_msg = "No active session found. Call resolve first."
             if camera_session_id:
                 error_msg = (
-                    f"Session {camera_session_id} not found for subject {subject_identifier}."
+                    f"Session {camera_session_id} not found "
+                    f"for subject {subject_identifier}."
                 )
             else:
-                error_msg += f" Sessions expire after {expire_minutes} minutes."
+                error_msg = (
+                    f"No session found for subject {subject_identifier}. "
+                    "Create a CameraSession in the EDC first."
+                )
             return Response(
                 {"code": "no_session", "error": error_msg},
                 status=status.HTTP_404_NOT_FOUND,
@@ -485,6 +469,16 @@ class FileUploadView(APIView):
             capture_datetime=capture_datetime,
             checksum=stored_checksum,
         )
+
+        # --- Generate JPEG preview for DICOM files ---
+        if file_type in _DICOM_FILE_TYPES:
+            preview_name = f"{dest.stem}_preview.jpg"
+            preview_path = dest.parent / "previews" / preview_name
+            if convert_dicom_to_jpeg(dest, preview_path):
+                session_file.preview_filename = (
+                    f"{camera_session_obj.pk}/previews/{preview_name}"
+                )
+                session_file.save(update_fields=["preview_filename"])
 
         logger.info(
             "Received %s for %s session=%s (%s bytes, stored=%s)",

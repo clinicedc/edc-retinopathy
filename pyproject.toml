@@ -9,6 +9,8 @@ dependencies = [
     "django>=5.2,<6.1",
     "djangorestframework>=3.16.0",
     "djangorestframework-stubs>=3.17.0",
+    "pillow>=11.0",
+    "pydicom>=3.0",
     "ruff>=0.15.15",
     "watchdog>=6.0.0",
 ]

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from clinicedc_constants import NOT_APPLICABLE, NULL_STRING, YES
+from clinicedc_constants import NOT_APPLICABLE, NOT_EVALUATED, NULL_STRING, YES
 from clinicedc_constants.choices import YES_NO_NA, YES_NO_NOT_EVALUATED
 from django.db import models
 from django.utils import timezone
@@ -66,8 +66,9 @@ class CameraSession(
             "Has the subject reported any issue with their "
             "eyes making them ineligible for retinopathy screening"
         ),
-        max_length=15,
+        max_length=25,
         choices=YES_NO_NOT_EVALUATED,
+        default=NOT_EVALUATED,
         help_text="Self-reported",
     )
 
@@ -77,6 +78,7 @@ class CameraSession(
         ),
         max_length=25,
         choices=YES_NO_NOT_EVALUATED,
+        default=NOT_EVALUATED,
         help_text="Self-reported or diagnosed.",
     )
 
@@ -84,6 +86,7 @@ class CameraSession(
         verbose_name="Does the patient have pre-existing retinal conditions?",
         max_length=25,
         choices=YES_NO_NOT_EVALUATED,
+        default=NOT_EVALUATED,
         help_text=(
             "Such as macular edema, retinal vascular occlusion, "
             "or any form of retinopathy not related to diabetes."
@@ -94,6 +97,7 @@ class CameraSession(
         verbose_name="Does the patient have a history of ocular interventions?",
         max_length=25,
         choices=YES_NO_NOT_EVALUATED,
+        default=NOT_EVALUATED,
         help_text=(
             "Including retinal laser treatment, intravitreal injections, "
             "or intraocular surgeries (excluding uncomplicated cataract surgery)."
@@ -106,6 +110,7 @@ class CameraSession(
         ),
         max_length=25,
         choices=YES_NO_NOT_EVALUATED,
+        default=NOT_EVALUATED,
     )
 
     op_comment = models.TextField(
