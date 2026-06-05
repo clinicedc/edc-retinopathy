@@ -21,6 +21,7 @@ class CameraSessionAdmin(
     form = CameraSessionForm
 
     show_object_tools: bool = True
+    show_cancel = True
     date_hierarchy = "created"
 
     autocomplete_fields = ("registered_subject",)

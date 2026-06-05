@@ -33,7 +33,7 @@
           <tr>
             <td>{{ session.subject_identifier }}</td>
             <td>
-              <a href="{% url 'edc_retinopathy_admin:edc_retinopathy_camerasession_change' session.pk %}">
+              <a href="{% url 'edc_retinopathy_admin:edc_retinopathy_camerasession_change' session.pk %}?next=edc_retinopathy:review-queue">
                 {{ session.report_datetime|date:"Y-m-d H:i" }}
               </a>
             </td>
