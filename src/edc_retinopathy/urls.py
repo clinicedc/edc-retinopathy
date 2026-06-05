@@ -4,6 +4,7 @@ from .admin_site import edc_retinopathy_admin
 from .views import (
     HomeView,
     ReviewDetailView,
+    ReviewedQueueView,
     ReviewQueueView,
     preview_image_view,
     report_view,
@@ -24,6 +25,11 @@ urlpatterns = [
         "review/",
         ReviewQueueView.as_view(),
         name="review-queue",
+    ),
+    path(
+        "reviewed/",
+        ReviewedQueueView.as_view(),
+        name="reviewed-queue",
     ),
     path(
         "review/<str:session_pk>/",
