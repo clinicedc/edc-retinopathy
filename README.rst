@@ -65,9 +65,6 @@ Settings
 ``EDC_RETINOPATHY_MAX_FILE_SIZE_MB``
     Maximum upload size in MB (default: 10).
 
-``EDC_RETINOPATHY_SESSION_EXPIRE_MINUTES``
-    Session expiry window in minutes (default: 120).
-
 See also https://edc-retinopathy.readthedocs.io/en/latest/
 
 .. |pypi| image:: https://img.shields.io/pypi/v/edc-retinopathy.svg
