@@ -1,8 +1,7 @@
 from django.urls import include, path
-from django.views.generic import RedirectView
 
 from .admin_site import edc_retinopathy_admin
-from .views import report_view
+from .views import HomeView, report_view
 
 app_name = "edc_retinopathy"
 
@@ -14,5 +13,5 @@ urlpatterns = [
         report_view,
         name="report-view",
     ),
-    path("", RedirectView.as_view(url=f"/{app_name}/admin/"), name="home_url"),
+    path("", HomeView.as_view(), name="home_url"),
 ]

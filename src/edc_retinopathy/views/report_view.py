@@ -7,7 +7,7 @@ from django.contrib.auth.decorators import login_required
 from django.http import Http404, HttpResponse
 from django.shortcuts import get_object_or_404
 
-from .models import SessionFile
+from ..models import SessionFile
 
 
 def _get_storage_dir() -> Path:
