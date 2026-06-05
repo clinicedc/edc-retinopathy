@@ -9,10 +9,10 @@
   <div class="col-sm-10">
     <div class="panel panel-default">
       <div class="panel-heading">
-        <i class="fas fa-eye fa-lg fa-fw"></i> DICOM Review Queue
+        <i class="fas fa-check-circle fa-lg fa-fw"></i> Reviewed Sessions
         <span class="pull-right">
-          <a href="{% url 'edc_retinopathy:reviewed-queue' %}">
-            <i class="fas fa-check-circle fa-fw"></i> Reviewed</a>
+          <a href="{% url 'edc_retinopathy:review-queue' %}">
+            <i class="fas fa-eye fa-fw"></i> Review queue</a>
           &nbsp;|&nbsp;
           <a href="{% url 'edc_retinopathy:home_url' %}">
             <i class="fas fa-reply fa-fw"></i> Back</a>
@@ -25,6 +25,7 @@
             <th>Session date</th>
             <th>OD files</th>
             <th>OS files</th>
+            <th>Screening</th>
             <th></th>
           </tr>
         </thead>
@@ -40,20 +41,39 @@
             <td>{{ session.od_dicom_count }}</td>
             <td>{{ session.os_dicom_count }}</td>
             <td>
+              {% if session.dmretinopathyscreening %}
+                <a href="{% url 'edc_retinopathy_admin:edc_retinopathy_dmretinopathyscreening_change' session.dmretinopathyscreening.pk %}">
+                  {{ session.dmretinopathyscreening.get_final_severity_grade_display }}
+                </a>
+              {% endif %}
+            </td>
+            <td>
               <a href="{% url 'edc_retinopathy:review-detail' session.pk %}"
-                 class="btn btn-sm btn-primary">
-                <i class="fas fa-search fa-fw"></i> Review</a>
+                 class="btn btn-sm btn-default">
+                <i class="fas fa-search fa-fw"></i> View</a>
             </td>
           </tr>
           {% empty %}
           <tr>
-            <td colspan="5" class="text-center text-muted">
-              No sessions awaiting review.
+            <td colspan="6" class="text-center text-muted">
+              No reviewed sessions yet.
             </td>
           </tr>
           {% endfor %}
         </tbody>
       </table>
+
+      {% if is_paginated %}
+        <div class="text-center">
+          {% if page_obj.has_previous %}
+            <a href="?page={{ page_obj.previous_page_number }}">&laquo; Previous</a>
+          {% endif %}
+          <span>Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+          {% if page_obj.has_next %}
+            <a href="?page={{ page_obj.next_page_number }}">Next &raquo;</a>
+          {% endif %}
+        </div>
+      {% endif %}
     </div>
   </div>
   <div class="col-sm-1">&nbsp;</div>

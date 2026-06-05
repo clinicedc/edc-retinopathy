@@ -6,7 +6,7 @@ from pathlib import Path
 
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
-from django.db.models import Exists, OuterRef
+from django.db.models import Count, Exists, OuterRef, Q
 from django.http import Http404, HttpResponse
 from django.shortcuts import get_object_or_404
 from django.views.generic import DetailView, ListView
@@ -42,6 +42,53 @@ class ReviewQueueView(EdcViewMixin, NavbarViewMixin, ListView):
         return (
             CameraSession.objects.filter(has_dicoms)
             .exclude(has_screening)
+            .annotate(
+                od_dicom_count=Count(
+                    "files",
+                    filter=Q(files__file_type="right_dicom"),
+                ),
+                os_dicom_count=Count(
+                    "files",
+                    filter=Q(files__file_type="left_dicom"),
+                ),
+            )
+            .order_by("-report_datetime")
+        )
+
+
+class ReviewedQueueView(EdcViewMixin, NavbarViewMixin, ListView):
+    """List sessions that have already been reviewed (screening exists)."""
+
+    template_name = "edc_retinopathy/reviewed_queue.html"
+    context_object_name = "sessions"
+    navbar_selected_item = "edc_lab_results"
+    paginate_by = 50
+
+    def get_queryset(self):
+        has_dicoms = Exists(
+            SessionFile.objects.filter(
+                camera_session=OuterRef("pk"),
+                file_type__in=("left_dicom", "right_dicom"),
+            ),
+        )
+        has_screening = Exists(
+            DmRetinopathyScreening.objects.filter(
+                camera_session=OuterRef("pk"),
+            ),
+        )
+        return (
+            CameraSession.objects.filter(has_dicoms)
+            .filter(has_screening)
+            .annotate(
+                od_dicom_count=Count(
+                    "files",
+                    filter=Q(files__file_type="right_dicom"),
+                ),
+                os_dicom_count=Count(
+                    "files",
+                    filter=Q(files__file_type="left_dicom"),
+                ),
+            )
             .order_by("-report_datetime")
         )
 
