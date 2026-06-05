@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from django.contrib import admin
 from django_audit_fields import audit_fieldset_tuple
+from edc_model_admin.dashboard import ModelAdminSubjectDashboardMixin
 from edc_model_admin.history import SimpleHistoryAdmin
 from rangefilter.filters import DateRangeFilterBuilder
 
@@ -11,11 +12,12 @@ from ..models import DmRetinopathyScreening
 
 
 @admin.register(DmRetinopathyScreening, site=edc_retinopathy_admin)
-class DmRetinopathyScreeningAdmin(SimpleHistoryAdmin):
+class DmRetinopathyScreeningAdmin(ModelAdminSubjectDashboardMixin, SimpleHistoryAdmin):
     form = DmRetinopathyScreeningForm
 
     show_object_tools: bool = True
     date_hierarchy = "created"
+    autocomplete_fields = ("camera_session",)
 
     list_display = (
         "camera_session",

@@ -1,5 +1,5 @@
-from clinicedc_constants import NULL_STRING
-from clinicedc_constants.choices import YES_NO
+from clinicedc_constants import NOT_APPLICABLE, NULL_STRING
+from clinicedc_constants.choices import YES_NO, YES_NO_NA
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from django.utils import timezone
@@ -17,7 +17,7 @@ class ContactAttempt(
     IdentityModelMixin,
     BaseUuidModel,
 ):
-    registered_subject = models.ForeignKey(
+    registered_subject = models.OneToOneField(
         RegisteredSubjectProxy,
         on_delete=models.PROTECT,
         related_name="contact_attempt",
@@ -39,10 +39,11 @@ class ContactAttempt(
     agreed_to_attend = models.CharField(
         "If contact made, has the subject agreed to attend the exam?",
         max_length=15,
-        choices=YES_NO,
+        choices=YES_NO_NA,
+        default=NOT_APPLICABLE,
     )
 
-    agreed_to_attend_datetime = models.DateField(
+    agreed_to_attend_date = models.DateField(
         "Date the subject plans to attend the exam?",
         null=True,
         blank=True,
@@ -51,6 +52,7 @@ class ContactAttempt(
     declined_reason = models.TextField(
         verbose_name="If the subject declined, give a brief reason why",
         default=NULL_STRING,
+        blank=True,
     )
 
     objects = PrnModelManager()

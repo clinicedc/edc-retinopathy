@@ -1,10 +1,9 @@
 from __future__ import annotations
 
 from clinicedc_constants import NOT_APPLICABLE, NULL_STRING, YES
-from clinicedc_constants.choices import GENDER, YES_NO, YES_NO_NA, YES_NO_PENDING_NA
+from clinicedc_constants.choices import YES_NO_NA, YES_NO_NOT_EVALUATED
 from django.db import models
 from django.utils import timezone
-from django_crypto_fields.fields import EncryptedCharField
 from edc_model.models import BaseUuidModel, HistoricalRecords
 from edc_prn.prn_model_manager import PrnModelManager
 from edc_sites.managers import CurrentSiteManager
@@ -41,16 +40,6 @@ class CameraSession(
 
     report_datetime = models.DateTimeField(default=timezone.now)
 
-    # unfit_for_exam = models.CharField(
-    #     verbose_name=(
-    #         "Has the subject reported any issue with their "
-    #         "eyes making them ineligible for retinopathy screening"
-    #     ),
-    #     max_length=15,
-    #     choices=YES_NO,
-    #     default=NULL_STRING,
-    # )
-
     device_id = models.CharField(
         max_length=100,
         blank=True,
@@ -65,19 +54,36 @@ class CameraSession(
         default=REPORT_TYPE_COMBINED,
     )
 
+    pregnant = models.CharField(
+        verbose_name="Is the patient pregnant?",
+        max_length=25,
+        choices=YES_NO_NA,
+        help_text="Not applicable for male patients.",
+    )
+
+    self_reported_impairment = models.CharField(
+        verbose_name=(
+            "Has the subject reported any issue with their "
+            "eyes making them ineligible for retinopathy screening"
+        ),
+        max_length=15,
+        choices=YES_NO_NOT_EVALUATED,
+        help_text="Self-reported",
+    )
+
     visual_impairment = models.CharField(
         verbose_name=(
             "Does the patient have persistent visual impairment in one or both eyes?"
         ),
         max_length=25,
-        choices=YES_NO_NA,
+        choices=YES_NO_NOT_EVALUATED,
         help_text="Self-reported or diagnosed.",
     )
 
     retinal_conditions = models.CharField(
         verbose_name="Does the patient have pre-existing retinal conditions?",
         max_length=25,
-        choices=YES_NO_NA,
+        choices=YES_NO_NOT_EVALUATED,
         help_text=(
             "Such as macular edema, retinal vascular occlusion, "
             "or any form of retinopathy not related to diabetes."
@@ -87,7 +93,7 @@ class CameraSession(
     ocular_interventions = models.CharField(
         verbose_name="Does the patient have a history of ocular interventions?",
         max_length=25,
-        choices=YES_NO_NA,
+        choices=YES_NO_NOT_EVALUATED,
         help_text=(
             "Including retinal laser treatment, intravitreal injections, "
             "or intraocular surgeries (excluding uncomplicated cataract surgery)."
@@ -99,22 +105,18 @@ class CameraSession(
             "Is the patient photosensitive or otherwise contraindicated for retinal imaging?"
         ),
         max_length=25,
-        choices=YES_NO_NA,
+        choices=YES_NO_NOT_EVALUATED,
     )
 
-    pregnant = models.CharField(
-        verbose_name="Is the patient pregnant?",
-        max_length=25,
-        choices=YES_NO_NA,
-        help_text="Not applicable for male patients.",
+    op_comment = models.TextField(
+        verbose_name="Ophthalmologist's comment", default=NULL_STRING
     )
-
-    op_comment = models.TextField(verbose_name="Opthamologist's comment", default=NULL_STRING)
 
     op_referral = models.CharField(
-        verbose_name="Has the Opthamologist referred the subject for follow-up care?",
+        verbose_name="Has the Ophthalmologist referred the subject for follow-up care?",
         choices=YES_NO_NA,
         max_length=15,
+        default=NOT_APPLICABLE,
     )
 
     referred_to = models.CharField(
@@ -133,6 +135,7 @@ class CameraSession(
         verbose_name="If referred, may we contact the patient to followup on the referral?",
         max_length=15,
         choices=YES_NO_NA,
+        default=NOT_APPLICABLE,
     )
 
     objects = PrnModelManager()

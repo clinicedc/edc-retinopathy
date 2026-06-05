@@ -29,8 +29,13 @@ class RegisteredSubjectProxyAdmin(BaseRegisteredSubjectAdmin):
         "dob",
         "gender",
     )
-    search_fields = ("subject_identifier",)
+    search_fields = ("subject_identifier", "initials")
 
-    readonly_fields = ("subject_identifier",)
+    readonly_fields = (
+        "subject_identifier",
+        "initials",
+        "dob",
+        "gender",
+    )
 
     radio_fields = {"gender": admin.HORIZONTAL}  # noqa: RUF012

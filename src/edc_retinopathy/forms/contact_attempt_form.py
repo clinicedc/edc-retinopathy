@@ -9,15 +9,15 @@ from ..models import ContactAttempt
 
 class ContactAttemptValidator(FormValidator):
     def clean(self):
-        self.required_if(
+        self.applicable_if(
             YES,
             field="contact_made",
-            field_required="agreed_to_attend",
+            field_applicable="agreed_to_attend",
         )
         self.required_if(
             YES,
             field="agreed_to_attend",
-            field_required="agreed_to_attend_datetime",
+            field_required="agreed_to_attend_date",
         )
         self.required_if(
             NO,
@@ -37,6 +37,6 @@ class ContactAttemptForm(FormValidatorMixin, forms.ModelForm):
             "number_of_attempts",
             "contact_made",
             "agreed_to_attend",
-            "agreed_to_attend_datetime",
+            "agreed_to_attend_date",
             "declined_reason",
         )

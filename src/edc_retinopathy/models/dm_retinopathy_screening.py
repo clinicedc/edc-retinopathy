@@ -3,7 +3,9 @@ from clinicedc_constants.choices import (
 )
 from django.db import models
 from django.utils import timezone
-from edc_model.models import BaseUuidModel
+from edc_model.models import BaseUuidModel, HistoricalRecords
+from edc_prn.prn_model_manager import PrnModelManager
+from edc_sites.managers import CurrentSiteManager
 from edc_sites.model_mixins import SiteModelMixin
 
 from edc_retinopathy.models import CameraSession
@@ -26,8 +28,8 @@ def evaluation_fields_factory_mixin(laterality: str) -> type[models.Model]:
         f"{laterality}_hemorrhages": models.CharField(
             max_length=25,
             choices=HemorrhageSeverity.choices,
-            default=HemorrhageSeverity.NONE,
             verbose_name=f"{label} Microaneurysms / Hemorrhages",
+            blank=False,
         ),
         f"{laterality}_cotton_wool_spots": models.CharField(
             verbose_name=f"{label} Cotton Wool Spots",
@@ -97,6 +99,8 @@ class DmRetinopathyScreening(
 
     report_datetime = models.DateTimeField(default=timezone.now)
 
+    subject_identifier = models.CharField(max_length=50, null=True, editable=False)
+
     interpreted_by = models.CharField(
         max_length=150, help_text="Name or ID of the reading Ophthalmologist"
     )
@@ -156,11 +160,19 @@ class DmRetinopathyScreening(
         help_text="Optional diagnostic narrative annotations",
     )
 
+    objects = PrnModelManager()
+    on_site = CurrentSiteManager()
+    history = HistoricalRecords(inherit=True)
+
     def __str__(self):
         return (
             f"{self.camera_session.subject_identifier} - "
             f"Grade: {self.get_final_severity_grade_display()}"
         )
+
+    def save(self, *args, **kwargs):
+        self.subject_identifier = self.camera_session.subject_identifier
+        super().save(*args, **kwargs)
 
     class Meta(BaseUuidModel.Meta):
         ordering = ("-report_datetime",)
