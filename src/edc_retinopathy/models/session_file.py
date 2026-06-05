@@ -58,6 +58,13 @@ class SessionFile(BaseUuidModel):
         help_text="SHA-256 hex digest of the stored file.",
     )
 
+    preview_filename = models.CharField(
+        max_length=255,
+        blank=True,
+        default="",
+        help_text="JPEG preview filename for DICOM files (relative to images/).",
+    )
+
     capture_datetime = models.DateTimeField(
         help_text="Capture timestamp as reported by the camera.",
     )
