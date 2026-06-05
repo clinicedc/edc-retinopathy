@@ -16,6 +16,7 @@ class DmRetinopathyScreeningAdmin(ModelAdminSubjectDashboardMixin, SimpleHistory
     form = DmRetinopathyScreeningForm
 
     show_object_tools: bool = True
+    show_cancel = True
     date_hierarchy = "created"
     autocomplete_fields = ("camera_session",)
 
