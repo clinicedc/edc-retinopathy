@@ -91,7 +91,7 @@
     {# --- Action --- #}
     <div class="panel panel-default">
       <div class="panel-body text-center">
-        <a href="{% url 'edc_retinopathy_admin:edc_retinopathy_dmretinopathyscreening_add' %}?camera_session={{ camera_session.pk }}"
+        <a href="{% url 'edc_retinopathy_admin:edc_retinopathy_dmretinopathyscreening_add' %}?camera_session={{ camera_session.pk }}&next=edc_retinopathy:review-queue"
            class="btn btn-primary btn-lg">
           <i class="fas fa-file-alt fa-fw"></i> Complete screening form
         </a>
