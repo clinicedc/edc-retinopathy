@@ -7,6 +7,7 @@ from .views import (
     ReviewedQueueView,
     ReviewQueueView,
     preview_image_view,
+    print_review_queue_report_view,
     report_view,
     stored_image_view,
 )
@@ -25,6 +26,11 @@ urlpatterns = [
         "review/",
         ReviewQueueView.as_view(),
         name="review-queue",
+    ),
+    path(
+        "review/report/",
+        print_review_queue_report_view,
+        name="review-queue-report",
     ),
     path(
         "reviewed/",
