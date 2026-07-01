@@ -26,20 +26,6 @@ class CameraSessionAdmin(
 
     autocomplete_fields = ("registered_subject",)
 
-    list_display = (
-        "subject_identifier",
-        "eligible",
-        "gender",
-        "initials",
-        "age_in_years",
-        "report_datetime",
-        "file_count",
-        "device_id",
-        "created",
-    )
-    list_filter = (("report_datetime", DateRangeFilterBuilder()), "device_id", "site")
-    search_fields = ("registered_subject__subject_identifier",)
-
     fieldsets = (
         (
             "Session",
@@ -86,6 +72,22 @@ class CameraSessionAdmin(
         "may_contact": admin.VERTICAL,
         "self_reported_impairment": admin.VERTICAL,
     }
+
+    list_display = (
+        "subject_identifier",
+        "eligible",
+        "gender",
+        "initials",
+        "age_in_years",
+        "report_datetime",
+        "file_count",
+        "device_id",
+        "created",
+    )
+
+    list_filter = (("report_datetime", DateRangeFilterBuilder()), "device_id", "site")
+
+    search_fields = ("registered_subject__subject_identifier",)
 
     @admin.display(description="Files")
     def file_count(self, obj: CameraSession) -> str:

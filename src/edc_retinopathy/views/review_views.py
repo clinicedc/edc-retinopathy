@@ -6,12 +6,14 @@ from pathlib import Path
 
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
+from django.contrib.sites.models import Site
 from django.db.models import Count, Exists, OuterRef, Q
 from django.http import Http404, HttpResponse
 from django.shortcuts import get_object_or_404
 from django.views.generic import DetailView, ListView
 from edc_dashboard.view_mixins import EdcViewMixin
 from edc_navbar import NavbarViewMixin
+from edc_sites.site import sites
 
 from ..models import CameraSession, DmRetinopathyScreening, SessionFile
 
@@ -21,7 +23,9 @@ def _get_storage_dir() -> Path:
 
 
 class ReviewQueueView(EdcViewMixin, NavbarViewMixin, ListView):
-    """List sessions that have DICOM uploads but no screening yet."""
+    """List sessions not yet reviewed (no screening), whether or not the
+    camera has uploaded images yet.
+    """
 
     template_name = "edc_retinopathy/review_queue.html"
     context_object_name = "sessions"
@@ -40,9 +44,9 @@ class ReviewQueueView(EdcViewMixin, NavbarViewMixin, ListView):
             ),
         )
         return (
-            CameraSession.objects.filter(has_dicoms)
-            .exclude(has_screening)
+            CameraSession.objects.exclude(has_screening)
             .annotate(
+                uploaded=has_dicoms,
                 od_dicom_count=Count(
                     "files",
                     filter=Q(files__file_type="right_dicom"),
@@ -52,8 +56,21 @@ class ReviewQueueView(EdcViewMixin, NavbarViewMixin, ListView):
                     filter=Q(files__file_type="left_dicom"),
                 ),
             )
-            .order_by("-report_datetime")
+            .order_by("-uploaded", "-report_datetime")
         )
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        site_titles = {site.id: sites.get(site.id).title for site in Site.objects.all()}
+        sessions = list(context["sessions"])
+        for session in sessions:
+            session.site_title = site_titles.get(session.site_id, "")
+        context["sessions"] = sessions
+        context["object_list"] = sessions
+        context["site_choices"] = sorted(
+            {session.site_title for session in sessions if session.site_title},
+        )
+        return context
 
 
 class ReviewedQueueView(EdcViewMixin, NavbarViewMixin, ListView):
@@ -62,7 +79,6 @@ class ReviewedQueueView(EdcViewMixin, NavbarViewMixin, ListView):
     template_name = "edc_retinopathy/reviewed_queue.html"
     context_object_name = "sessions"
     navbar_selected_item = "edc_lab_results"
-    paginate_by = 50
 
     def get_queryset(self):
         has_dicoms = Exists(
