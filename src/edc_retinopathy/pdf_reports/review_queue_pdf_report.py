@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections import Counter
+
 from django.contrib.sites.models import Site
 from django.db.models import Count, Exists, OuterRef, Q
 from django.utils import timezone
@@ -22,7 +24,15 @@ _HEADER_STYLE = ParagraphStyle(
     "col_header", fontSize=8, alignment=TA_LEFT, fontName="Helvetica-Bold",
 )
 _CELL_STYLE = ParagraphStyle("cell", fontSize=7, alignment=TA_LEFT, leading=9)
+_CELL_RIGHT = ParagraphStyle("cell_r", fontSize=7, alignment=TA_RIGHT, leading=9)
+_SECTION_STYLE = ParagraphStyle(
+    "section", fontSize=10, alignment=TA_LEFT, fontName="Helvetica-Bold",
+)
 _ALT_ROW = colors.Color(0.95, 0.95, 0.95)
+
+# Fixed display order for the end-of-report value counts.
+_UPLOADED_ORDER = ("No", "OS-ONLY", "OD-ONLY", "YES")
+_REVIEW_ORDER = ("Awaiting results", "Ready for review", "Reviewed")
 
 
 def _uploaded_label(od_count: int, os_count: int) -> str:
@@ -72,7 +82,8 @@ class ReviewQueueReport(Report):
         canvas.setFontSize(6)
         timestamp = to_local(timezone.now()).strftime("%Y-%m-%d %H:%M")
         canvas.drawString(35, self.footer_row_height, self.protocol_name.upper())
-        canvas.drawCentredString(width / 2.0, self.footer_row_height, "CONFIDENTIAL")
+        # Sit CONFIDENTIAL above the centred "Page x of y" drawn by NumberedCanvas.
+        canvas.drawCentredString(width / 2.0, self.footer_row_height + 10, "CONFIDENTIAL")
         canvas.drawRightString(
             width - 35, self.footer_row_height, f"printed on {timestamp}",
         )
@@ -100,7 +111,44 @@ class ReviewQueueReport(Report):
             story.append(Paragraph("No sessions found.", _CELL_STYLE))
             return story
         story.append(self._table(rows))
+        story.extend(self._summary_flowables(rows))
         return story
+
+    def _summary_flowables(self, rows: list[dict]) -> list:
+        """Value counts (with totals) for the Uploaded and Review columns."""
+        uploaded_counts = Counter(row["uploaded"] for row in rows)
+        review_counts = Counter(row["review"] for row in rows)
+        total = len(rows)
+        return [
+            Spacer(0.1 * cm, 0.6 * cm),
+            Paragraph("Summary", _SECTION_STYLE),
+            Spacer(0.1 * cm, 0.25 * cm),
+            self._counts_table("Uploaded", _UPLOADED_ORDER, uploaded_counts, total),
+            Spacer(0.1 * cm, 0.35 * cm),
+            self._counts_table("Review", _REVIEW_ORDER, review_counts, total),
+        ]
+
+    @staticmethod
+    def _counts_table(
+        title: str, order: tuple[str, ...], counts: Counter, total: int,
+    ) -> Table:
+        data = [[Paragraph(title, _HEADER_STYLE), Paragraph("Count", _HEADER_STYLE)]]
+        data += [
+            [Paragraph(key, _CELL_STYLE), Paragraph(str(counts.get(key, 0)), _CELL_RIGHT)]
+            for key in order
+        ]
+        data.append([Paragraph("Total", _HEADER_STYLE), Paragraph(str(total), _HEADER_STYLE)])
+        table = Table(data, colWidths=[4.5 * cm, 2.0 * cm])
+        last = len(data) - 1
+        table.setStyle(TableStyle([
+            ("GRID", (0, 0), (-1, -1), 0.5, colors.black),
+            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+            ("FONTNAME", (0, last), (-1, last), "Helvetica-Bold"),
+            ("BACKGROUND", (0, last), (-1, last), _ALT_ROW),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("FONTSIZE", (0, 0), (-1, -1), 7),
+        ]))
+        return table
 
     def _build_rows(self) -> list[dict]:
         has_dicoms = Exists(
