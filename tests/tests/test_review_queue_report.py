@@ -111,8 +111,13 @@ class ReviewQueueReportTests(RetinopathyTestCaseMixin):
         self.assertEqual(review_counts["Reviewed"], 1)
         self.assertEqual(sum(review_counts.values()), 4)
 
-        # Summary flowables are appended (section title + two counts tables).
-        self.assertEqual(len(ReviewQueueReport()._summary_flowables(rows)), 6)
+        # All four sessions share the one test site.
+        site_counts = Counter(row["site"] for row in rows)
+        self.assertEqual(len(site_counts), 1)
+        self.assertEqual(sum(site_counts.values()), 4)
+
+        # Summary flowables are appended (section title + three counts tables).
+        self.assertEqual(len(ReviewQueueReport()._summary_flowables(rows)), 8)
 
     def test_report_builds_pdf(self) -> None:
         rs = self.create_registered_subject()

@@ -115,14 +115,18 @@ class ReviewQueueReport(Report):
         return story
 
     def _summary_flowables(self, rows: list[dict]) -> list:
-        """Value counts (with totals) for the Uploaded and Review columns."""
+        """Value counts (with totals) for the Site, Uploaded and Review columns."""
         uploaded_counts = Counter(row["uploaded"] for row in rows)
         review_counts = Counter(row["review"] for row in rows)
+        site_counts = Counter(row["site"] or "(no site)" for row in rows)
+        site_order = tuple(sorted(site_counts))
         total = len(rows)
         return [
             Spacer(0.1 * cm, 0.6 * cm),
             Paragraph("Summary", _SECTION_STYLE),
             Spacer(0.1 * cm, 0.25 * cm),
+            self._counts_table("Site", site_order, site_counts, total),
+            Spacer(0.1 * cm, 0.35 * cm),
             self._counts_table("Uploaded", _UPLOADED_ORDER, uploaded_counts, total),
             Spacer(0.1 * cm, 0.35 * cm),
             self._counts_table("Review", _REVIEW_ORDER, review_counts, total),
