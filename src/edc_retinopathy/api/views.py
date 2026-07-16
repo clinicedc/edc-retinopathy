@@ -93,6 +93,72 @@ def _compute_sha256(file_path: Path) -> str:
     return h.hexdigest()
 
 
+def _compute_sha256_uploaded(uploaded_file) -> str:
+    """Compute SHA-256 hex digest of an in-memory/temp uploaded file.
+
+    Leaves the file position at 0 so it can still be written to disk
+    afterwards.
+    """
+    h = hashlib.sha256()
+    uploaded_file.seek(0)
+    for chunk in uploaded_file.chunks():
+        h.update(chunk)
+    uploaded_file.seek(0)
+    return h.hexdigest()
+
+
+def _duplicate_upload_response(
+    subject_identifier: str,
+    file_type: str,
+    camera_session_obj: CameraSession,
+    uploaded_file,
+) -> Response | None:
+    """Handle a retry of a file already stored for this session.
+
+    A retried upload (e.g. the client timed out waiting for a response
+    that was in fact sent) would otherwise hit the unique constraint on
+    (camera_session, original_filename) and crash with an uncaught
+    IntegrityError. Returns a Response if *uploaded_file* is a duplicate
+    (identical or conflicting) of an existing SessionFile, else None.
+    """
+    existing = SessionFile.objects.filter(
+        camera_session=camera_session_obj,
+        original_filename=uploaded_file.name,
+    ).first()
+    if existing is None:
+        return None
+
+    incoming_checksum = _compute_sha256_uploaded(uploaded_file)
+    if incoming_checksum == existing.checksum:
+        logger.info(
+            "Duplicate upload for %s/%s session=%s ignored "
+            "(already stored, checksum match).",
+            subject_identifier,
+            file_type,
+            camera_session_obj.pk,
+        )
+        return Response(_image_response_data(existing), status=status.HTTP_200_OK)
+
+    logger.warning(
+        "Filename conflict for %s/%s session=%s: '%s' already stored "
+        "with a different checksum.",
+        subject_identifier,
+        file_type,
+        camera_session_obj.pk,
+        uploaded_file.name,
+    )
+    return Response(
+        {
+            "code": "filename_conflict",
+            "error": (
+                f"A file named '{uploaded_file.name}' was already "
+                "uploaded for this session with different content."
+            ),
+        },
+        status=status.HTTP_409_CONFLICT,
+    )
+
+
 def _image_response_data(session_file: SessionFile) -> dict:
     """Build the standard response payload for a SessionFile."""
     return {
@@ -125,6 +191,30 @@ def _find_camera_session(
         )
         .order_by("-report_datetime")
         .first()
+    )
+
+
+def _resolve_camera_session_or_error(
+    subject_identifier: str,
+    camera_session_id: str | None,
+) -> tuple[CameraSession | None, Response | None]:
+    """Resolve the target CameraSession, or build a 404 error Response."""
+    camera_session_obj = _find_camera_session(
+        subject_identifier,
+        camera_session_id=camera_session_id,
+    )
+    if camera_session_obj:
+        return camera_session_obj, None
+    if camera_session_id:
+        error_msg = f"Session {camera_session_id} not found for subject {subject_identifier}."
+    else:
+        error_msg = (
+            f"No session found for subject {subject_identifier}. "
+            "Create a CameraSession in the EDC first."
+        )
+    return None, Response(
+        {"code": "no_session", "error": error_msg},
+        status=status.HTTP_404_NOT_FOUND,
     )
 
 
@@ -379,25 +469,22 @@ class FileUploadView(APIView):
         # --- Find camera_session_obj (by explicit camera_session_id or most recent) ---
         camera_session_id = request.query_params.get("camera_session_id") or None
 
-        camera_session_obj = _find_camera_session(
+        camera_session_obj, error_response = _resolve_camera_session_or_error(
             subject_identifier,
-            camera_session_id=camera_session_id,
+            camera_session_id,
         )
-        if not camera_session_obj:
-            if camera_session_id:
-                error_msg = (
-                    f"Session {camera_session_id} not found "
-                    f"for subject {subject_identifier}."
-                )
-            else:
-                error_msg = (
-                    f"No session found for subject {subject_identifier}. "
-                    "Create a CameraSession in the EDC first."
-                )
-            return Response(
-                {"code": "no_session", "error": error_msg},
-                status=status.HTTP_404_NOT_FOUND,
-            )
+        if error_response is not None:
+            return error_response
+
+        # --- Idempotency check: has this exact file already been received? ---
+        duplicate_response = _duplicate_upload_response(
+            subject_identifier,
+            file_type,
+            camera_session_obj,
+            uploaded_file,
+        )
+        if duplicate_response is not None:
+            return duplicate_response
 
         # --- Save file under session subdirectory with original filename ---
         session_dir = _get_storage_dir() / str(camera_session_obj.pk)

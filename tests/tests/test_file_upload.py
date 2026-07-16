@@ -476,6 +476,76 @@ class ChecksumTests(FileUploadBaseTestCase):
         self.assertEqual(response.status_code, 201)
 
 
+class DuplicateUploadTests(FileUploadBaseTestCase):
+    """A retried upload (same filename) must not crash with a 500."""
+
+    def test_identical_retry_is_idempotent(self) -> None:
+        content = b"\xff\xd8\xff\xe0" + b"\x00" * 100
+        payload = {
+            "file": SimpleUploadedFile("left.jpg", content, "image/jpeg"),
+            "capture_datetime": CAPTURE_DT,
+        }
+        first = self.client.post(self._upload_url("left"), payload, format="multipart")
+        self.assertEqual(first.status_code, 201)
+
+        retry_payload = {
+            "file": SimpleUploadedFile("left.jpg", content, "image/jpeg"),
+            "capture_datetime": CAPTURE_DT,
+        }
+        second = self.client.post(self._upload_url("left"), retry_payload, format="multipart")
+        self.assertEqual(second.status_code, 200)
+        self.assertEqual(second.data["id"], first.data["id"])
+        self.assertEqual(SessionFile.objects.count(), 1)
+
+    def test_same_filename_different_content_returns_409(self) -> None:
+        first_payload = {
+            "file": SimpleUploadedFile(
+                "left.jpg", b"\xff\xd8\xff\xe0" + b"\x00" * 100, "image/jpeg",
+            ),
+            "capture_datetime": CAPTURE_DT,
+        }
+        first = self.client.post(self._upload_url("left"), first_payload, format="multipart")
+        self.assertEqual(first.status_code, 201)
+
+        conflicting_payload = {
+            "file": SimpleUploadedFile(
+                "left.jpg", b"\xff\xd8\xff\xe0" + b"\x11" * 100, "image/jpeg",
+            ),
+            "capture_datetime": CAPTURE_DT,
+        }
+        second = self.client.post(
+            self._upload_url("left"),
+            conflicting_payload,
+            format="multipart",
+        )
+        self.assertEqual(second.status_code, 409)
+        self.assertEqual(second.data["code"], "filename_conflict")
+        self.assertEqual(SessionFile.objects.count(), 1)
+
+    def test_retry_of_dicom_upload_is_idempotent(self) -> None:
+        content = (b"\x00" * 128) + b"DICM" + (b"\x00" * 1916)
+        first = self.client.post(
+            self._upload_url("right_dicom"),
+            {
+                "file": SimpleUploadedFile("scan.dcm", content, "application/dicom"),
+                "capture_datetime": CAPTURE_DT,
+            },
+            format="multipart",
+        )
+        self.assertEqual(first.status_code, 201)
+
+        second = self.client.post(
+            self._upload_url("right_dicom"),
+            {
+                "file": SimpleUploadedFile("scan.dcm", content, "application/dicom"),
+                "capture_datetime": CAPTURE_DT,
+            },
+            format="multipart",
+        )
+        self.assertEqual(second.status_code, 200)
+        self.assertEqual(SessionFile.objects.count(), 1)
+
+
 class SessionIdParamTests(FileUploadBaseTestCase):
     def test_upload_to_specific_session(self) -> None:
         older_camera_session = self.camera_session
