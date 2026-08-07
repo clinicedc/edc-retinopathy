@@ -3,6 +3,7 @@ from django.urls import include, path
 from .admin_site import edc_retinopathy_admin
 from .views import (
     HomeView,
+    NotExaminedView,
     ReviewDetailView,
     ReviewedQueueView,
     ReviewQueueView,
@@ -41,6 +42,11 @@ urlpatterns = [
         "review/<str:session_pk>/",
         ReviewDetailView.as_view(),
         name="review-detail",
+    ),
+    path(
+        "not-examined/",
+        NotExaminedView.as_view(),
+        name="not-examined",
     ),
     path(
         "preview/<str:session_file_id>/",
