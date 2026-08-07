@@ -5,28 +5,28 @@
 
 {{ block.super }}
 
-  <div class="col-sm-4">&nbsp;</div>
-  <div class="col-sm-4">
+<div class="col-sm-4">&nbsp;</div>
+<div class="col-sm-4">
     <div class="panel panel-default">
-      <div class="panel-heading"><i class="fas fa-eye fa-lg fa-fw"></i> EDC Retinopathy</div>
-      <div class="list-group">
-        <a href="{% url 'administration_url' %}" class="list-group-item">
-          <i class="fas fa-reply fa-1x fa-fw" aria-hidden="true"></i> Home</a>
-        <a href="{% url 'edc_retinopathy_admin:edc_retinopathy_contactattempt_changelist' %}" class="list-group-item">
-          <i class="fas fa-file fa-1x fa-fw" aria-hidden="true"></i> Log contact attempts</a>
-        <a href="{% url 'edc_retinopathy_admin:edc_retinopathy_camerasession_changelist' %}" class="list-group-item">
-          <i class="fas fa-camera fa-1x fa-fw" aria-hidden="true"></i> Start a camera session</a>
-        <a href="{% url 'edc_retinopathy:review-queue' %}" class="list-group-item">
-          <i class="fas fa-eye fa-1x fa-fw" aria-hidden="true"></i> Review DICOM images</a>
-        <a href="{% url 'edc_retinopathy_admin:edc_retinopathy_dmretinopathyscreening_changelist' %}" class="list-group-item">
-          <i class="fas fa-file-alt fa-1x fa-fw" aria-hidden="true"></i> Ophthamologist's report</a>
-        <a href="{% url 'edc_retinopathy_admin:edc_retinopathy_referralfollowup_changelist' %}" class="list-group-item">
-          <i class="fas fa-bell fa-1x fa-fw" aria-hidden="true"></i> Follow-up on referral</a>
-        <a href="{% url 'edc_retinopathy_admin:index' %}" class="list-group-item">
-          <i class="fas fa-table fa-1x fa-fw" aria-hidden="true"></i> Admin</a>
-      </div>
+        <div class="panel-heading"><i class="fas fa-eye fa-lg fa-fw"></i> EDC Retinopathy</div>
+        <div class="list-group">
+            <a href="{% url 'home_url' %}" class="list-group-item">
+                <i class="fas fa-reply fa-1x fa-fw" aria-hidden="true"></i> Home</a>
+            <a href="{% url 'edc_retinopathy_admin:edc_retinopathy_contactattempt_changelist' %}" class="list-group-item">
+                <i class="fas fa-file fa-1x fa-fw" aria-hidden="true"></i> Log contact attempts</a>
+            <a href="{% url 'edc_retinopathy_admin:edc_retinopathy_camerasession_changelist' %}" class="list-group-item">
+                <i class="fas fa-camera fa-1x fa-fw" aria-hidden="true"></i> Start a camera session</a>
+            <a href="{% url 'edc_retinopathy:review-queue' %}" class="list-group-item">
+                <i class="fas fa-eye fa-1x fa-fw" aria-hidden="true"></i> Review DICOM images</a>
+            <a href="{% url 'edc_retinopathy_admin:edc_retinopathy_dmretinopathyscreening_changelist' %}" class="list-group-item">
+                <i class="fas fa-file-alt fa-1x fa-fw" aria-hidden="true"></i> Ophthamologist's report</a>
+            <a href="{% url 'edc_retinopathy_admin:edc_retinopathy_referralfollowup_changelist' %}" class="list-group-item">
+                <i class="fas fa-bell fa-1x fa-fw" aria-hidden="true"></i> Follow-up on referral</a>
+            <a href="{% url 'edc_retinopathy_admin:index' %}" class="list-group-item">
+                <i class="fas fa-table fa-1x fa-fw" aria-hidden="true"></i> Admin</a>
+        </div>
     </div>
-  </div>
-  <div class="col-sm-4">&nbsp;</div>
+</div>
+<div class="col-sm-4">&nbsp;</div>
 
 {% endblock main %}
