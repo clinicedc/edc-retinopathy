@@ -11,7 +11,7 @@ Overview
 The camera follows this protocol for each patient encounter:
 
 1. **Ping** the server to verify connectivity and authentication.
-2. **Resolve** the subject identifier (confirms a CameraSession exists).
+2. **Resolve** the subject identifier (confirms a EyeExamRegister exists).
 3. **Upload** eye images, DICOM files, and reports.
 4. **Check status** to verify all expected files were received.
 
@@ -75,8 +75,8 @@ Success response (200)
 Resolve Subject
 ---------------
 
-Confirms that a **CameraSession** exists on the server for the given
-subject.  The CameraSession must be created by a clinician in the EDC
+Confirms that a **EyeExamRegister** exists on the server for the given
+subject.  The EyeExamRegister must be created by a clinician in the EDC
 before the camera exam.
 
 The server walks sessions newest-first and skips any that are
@@ -121,7 +121,7 @@ Success response (200)
 
    {
      "subject_identifier": "105-10-0001-2",
-     "camera_session_id": "f8e7d6c5-b4a3-2190-fedc-ba9876543210",
+     "eye_exam_register_id": "f8e7d6c5-b4a3-2190-fedc-ba9876543210",
      "uploaded": ["left", "right"]
    }
 
@@ -169,7 +169,7 @@ Success response (200)
 .. code-block:: json
 
    {
-     "camera_session_id": "f8e7d6c5-b4a3-2190-fedc-ba9876543210",
+     "eye_exam_register_id": "f8e7d6c5-b4a3-2190-fedc-ba9876543210",
      "subject_identifier": "105-10-0001-2",
      "report_datetime": "2026-05-21T10:15:30.123456+00:00",
      "uploaded": ["left", "right"],
@@ -266,7 +266,7 @@ Request body
 Query parameters
 ^^^^^^^^^^^^^^^^
 
-``camera_session_id`` (optional)
+``eye_exam_register_id`` (optional)
     Target a specific session instead of the most recent one.  Useful
     after reconnection.
 
@@ -277,7 +277,7 @@ Success response (201)
 
    {
      "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-     "camera_session_id": "f8e7d6c5-b4a3-2190-fedc-ba9876543210",
+     "eye_exam_register_id": "f8e7d6c5-b4a3-2190-fedc-ba9876543210",
      "file_type": "left",
      "original_filename": "105-60-00224-7_Retina_OD_20260602_121802.jpg",
      "stored_filename": "f8e7d6c5-b4a3-2190-fedc-ba9876543210/105-60-00224-7_Retina_OD_20260602_121802.jpg",
@@ -314,7 +314,7 @@ Error Codes
      - Meaning
    * - ``no_session``
      - 404
-     - No CameraSession found for this subject.
+     - No EyeExamRegister found for this subject.
    * - ``no_eligible_session``
      - 400
      - Sessions exist but all are complete or contraindicated.
@@ -364,7 +364,7 @@ check will report an error if it is missing.
 Data Model
 ==========
 
-CameraSession
+EyeExamRegister
 -------------
 
 Created by the clinician in the EDC before the exam.  Links to
@@ -410,7 +410,7 @@ Properties:
 SessionFile
 -----------
 
-One record per uploaded file, linked to a CameraSession.
+One record per uploaded file, linked to a EyeExamRegister.
 
 .. list-table::
    :header-rows: 1
@@ -422,9 +422,9 @@ One record per uploaded file, linked to a CameraSession.
    * - ``id``
      - UUIDField
      - Primary key.
-   * - ``camera_session``
+   * - ``eye_exam_register``
      - ForeignKey
-     - Link to CameraSession (PROTECT).
+     - Link to EyeExamRegister (PROTECT).
    * - ``file_type``
      - CharField
      - One of: ``left``, ``right``, ``left_dicom``, ``right_dicom``,
@@ -451,7 +451,7 @@ One record per uploaded file, linked to a CameraSession.
      - DateTimeField
      - Server-side upload timestamp (auto).
 
-**Constraints:** Unique on ``(camera_session, original_filename)`` --
+**Constraints:** Unique on ``(eye_exam_register, original_filename)`` --
 prevents duplicate uploads of the same file within a session.  Multiple
 files with the same ``file_type`` are allowed.
 

@@ -7,7 +7,7 @@ class ResolveSubjectSerializer(serializers.Serializer):
     """Validates the resolve-subject payload from the camera.
 
     Only the subject_identifier is required.  The server confirms
-    that a CameraSession exists for this subject.
+    that a EyeExamRegister exists for this subject.
     """
 
     subject_identifier = serializers.CharField(max_length=50)

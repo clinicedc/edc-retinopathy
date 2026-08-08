@@ -5,25 +5,31 @@ from __future__ import annotations
 from datetime import date
 from typing import Any
 
-from clinicedc_constants import NO
+from clinicedc_constants import NO, YES
 from django.conf import settings
 from django.db.models import QuerySet
 from django.utils import timezone
 from edc_utils import age, get_utcnow
 
 from edc_retinopathy.models import ContactAttempt, RegisteredSubjectProxy
-from edc_retinopathy.views import NotExaminedView
-from edc_retinopathy.views.not_examined_view import _decorate
+from edc_retinopathy.views import CallListView
+from edc_retinopathy.views.call_list_view import (
+    AGREED_CHOICES,
+    AGREED_FILTER_CHOICES,
+    NOT_CONTACTED,
+    _decorate,
+    _site_choices,
+)
 
 from .mixins import RetinopathyTestCaseMixin
 
 
-class NotExaminedTests(RetinopathyTestCaseMixin):
-    """Tests for NotExaminedView."""
+class CallListTests(RetinopathyTestCaseMixin):
+    """Tests for CallListView."""
 
     @staticmethod
     def _queryset() -> QuerySet[dict[str, Any]]:
-        return NotExaminedView().get_queryset()
+        return CallListView().get_queryset()
 
     def _create_contact_attempt(
         self,
@@ -38,7 +44,7 @@ class NotExaminedTests(RetinopathyTestCaseMixin):
             site_id=settings.SITE_ID,
         )
 
-    def test_subject_without_camera_session_is_listed(self) -> None:
+    def test_subject_without_eye_exam_register_is_listed(self) -> None:
         self.create_registered_subject("105-10-0001-2")
 
         self.assertEqual(
@@ -46,15 +52,15 @@ class NotExaminedTests(RetinopathyTestCaseMixin):
             ["105-10-0001-2"],
         )
 
-    def test_subject_with_camera_session_is_excluded(self) -> None:
+    def test_subject_with_eye_exam_register_is_excluded(self) -> None:
         registered_subject = self.create_registered_subject("105-10-0001-2")
-        self.create_camera_session(registered_subject)
+        self.create_eye_exam_register(registered_subject)
 
         self.assertEqual(self._queryset().count(), 0)
 
     def test_only_subjects_without_a_session_are_listed(self) -> None:
         examined = self.create_registered_subject("105-10-0001-2", initials="AA")
-        self.create_camera_session(examined)
+        self.create_eye_exam_register(examined)
         self.create_registered_subject("105-10-0002-3", initials="BB")
         self.create_registered_subject("105-10-0003-4", initials="CC")
 
@@ -66,8 +72,8 @@ class NotExaminedTests(RetinopathyTestCaseMixin):
 
     def test_a_second_session_does_not_re_list_the_subject(self) -> None:
         registered_subject = self.create_registered_subject("105-10-0001-2")
-        self.create_camera_session(registered_subject)
-        self.create_camera_session(registered_subject)
+        self.create_eye_exam_register(registered_subject)
+        self.create_eye_exam_register(registered_subject)
 
         self.assertEqual(self._queryset().count(), 0)
 
@@ -129,3 +135,59 @@ class NotExaminedTests(RetinopathyTestCaseMixin):
         row = _decorate(list(self._queryset()))[0]
 
         self.assertIsNone(row["age_in_years"])
+
+    def test_site_choices_are_the_raw_site_ids(self) -> None:
+        """The Site column renders site_id, so the filter must offer site ids.
+
+        The DataTables column filter is an exact match against the rendered
+        cell text, so the dropdown values have to be the same integers.
+        """
+        self.create_registered_subject("105-10-0001-2", initials="AA")
+        self.create_registered_subject("105-10-0002-3", initials="BB")
+
+        rows = list(self._queryset())
+
+        self.assertEqual(_site_choices(rows), [settings.SITE_ID])
+
+    def test_site_choices_are_sorted_and_distinct(self) -> None:
+        rows = [{"site_id": 30}, {"site_id": 10}, {"site_id": 30}, {"site_id": 20}]
+
+        self.assertEqual(_site_choices(rows), [10, 20, 30])
+
+    def test_site_choices_omits_a_null_site(self) -> None:
+        rows = [{"site_id": 10}, {"site_id": None}]
+
+        self.assertEqual(_site_choices(rows), [10])
+
+    def test_agreed_choices_are_valid_model_values(self) -> None:
+        """The Agreed filter is an exact match on the raw stored value.
+
+        If these drift from the field's choices the dropdown silently
+        matches nothing, so pin them to the model.
+        """
+        field = ContactAttempt._meta.get_field("agreed_to_attend")
+        valid = {value for value, _ in field.choices}
+
+        self.assertTrue(set(AGREED_CHOICES).issubset(valid))
+
+    def test_filter_choices_add_not_contacted_to_the_model_values(self) -> None:
+        """`Not contacted` is a filter-only token, not a stored value.
+
+        Rows with no contact attempt render an empty Agreed cell, and the
+        filter reads "" as "no filter", so they need their own token.
+        """
+        field = ContactAttempt._meta.get_field("agreed_to_attend")
+        valid = {value for value, _ in field.choices}
+
+        self.assertEqual(AGREED_FILTER_CHOICES, (*AGREED_CHOICES, NOT_CONTACTED))
+        self.assertNotIn(NOT_CONTACTED, valid)
+
+    def test_agreed_is_annotated_from_the_contact_attempt(self) -> None:
+        registered_subject = self.create_registered_subject("105-10-0001-2")
+        contact_attempt = self._create_contact_attempt(registered_subject)
+        contact_attempt.agreed_to_attend = YES
+        contact_attempt.save()
+
+        row = self._queryset().get()
+
+        self.assertEqual(row["agreed"], YES)

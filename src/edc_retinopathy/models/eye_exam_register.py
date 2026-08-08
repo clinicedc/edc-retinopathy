@@ -23,7 +23,7 @@ from .model_mixins import IdentityModelMixin
 from .registered_subject_proxy import RegisteredSubjectProxy
 
 
-class CameraSession(
+class EyeExamRegister(
     SiteModelMixin,
     IdentityModelMixin,
     BaseUuidModel,
@@ -175,5 +175,5 @@ class CameraSession(
         return YES in answers
 
     class Meta(BaseUuidModel.Meta):
-        verbose_name = "Camera Session"
-        verbose_name_plural = "Camera Sessions"
+        verbose_name = "Eye exam register"
+        verbose_name_plural = "Eye exam register"

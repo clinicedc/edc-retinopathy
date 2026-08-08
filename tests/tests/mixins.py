@@ -13,7 +13,7 @@ from rest_framework.authtoken.models import Token
 from rest_framework.test import APIClient
 
 from edc_retinopathy.constants import REPORT_TYPE_COMBINED
-from edc_retinopathy.models import CameraSession
+from edc_retinopathy.models import EyeExamRegister
 
 
 class RetinopathyTestCaseMixin(TestCase):
@@ -48,12 +48,12 @@ class RetinopathyTestCaseMixin(TestCase):
             dob=dob,
         )
 
-    def create_camera_session(
+    def create_eye_exam_register(
         self,
         registered_subject: RegisteredSubject,
         report_type: str = REPORT_TYPE_COMBINED,
         **kwargs,
-    ) -> CameraSession:
+    ) -> EyeExamRegister:
         defaults = {
             "registered_subject": registered_subject,
             "report_datetime": timezone.now(),
@@ -66,4 +66,4 @@ class RetinopathyTestCaseMixin(TestCase):
             "site_id": settings.SITE_ID,
         }
         defaults.update(kwargs)
-        return CameraSession.objects.create(**defaults)
+        return EyeExamRegister.objects.create(**defaults)

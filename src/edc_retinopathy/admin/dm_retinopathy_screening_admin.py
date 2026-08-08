@@ -18,10 +18,10 @@ class DmRetinopathyScreeningAdmin(ModelAdminSubjectDashboardMixin, SimpleHistory
     show_object_tools: bool = True
     show_cancel = True
     date_hierarchy = "created"
-    autocomplete_fields = ("camera_session",)
+    autocomplete_fields = ("eye_exam_register",)
 
     list_display = (
-        "camera_session",
+        "eye_exam_register",
         "report_datetime",
         "image_quality",
         "final_severity_grade",
@@ -39,7 +39,7 @@ class DmRetinopathyScreeningAdmin(ModelAdminSubjectDashboardMixin, SimpleHistory
         "site",
     )
     search_fields = (
-        "camera_session__subject_identifier",
+        "eye_exam_register__subject_identifier",
         "interpreted_by",
     )
 
@@ -48,7 +48,7 @@ class DmRetinopathyScreeningAdmin(ModelAdminSubjectDashboardMixin, SimpleHistory
             None,
             {
                 "fields": (
-                    "camera_session",
+                    "eye_exam_register",
                     "report_datetime",
                     "interpreted_by",
                 ),

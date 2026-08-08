@@ -7,7 +7,6 @@ from copy import deepcopy
 
 from clinicedc_constants import NO, NOT_APPLICABLE, OTHER, YES
 from django import forms
-from django.test import TestCase
 from django.utils import timezone
 
 from edc_retinopathy.forms.contact_attempt_form import ContactAttemptValidator

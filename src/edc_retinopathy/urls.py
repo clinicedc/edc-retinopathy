@@ -2,8 +2,8 @@ from django.urls import include, path
 
 from .admin_site import edc_retinopathy_admin
 from .views import (
+    CallListView,
     HomeView,
-    NotExaminedView,
     ReviewDetailView,
     ReviewedQueueView,
     ReviewQueueView,
@@ -44,9 +44,9 @@ urlpatterns = [
         name="review-detail",
     ),
     path(
-        "not-examined/",
-        NotExaminedView.as_view(),
-        name="not-examined",
+        "call-list/",
+        CallListView.as_view(),
+        name="call-list",
     ),
     path(
         "preview/<str:session_file_id>/",

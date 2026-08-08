@@ -3,10 +3,10 @@ from __future__ import annotations
 from clinicedc_constants import FEMALE, MALE, NOT_APPLICABLE
 from django import forms
 
-from ..models import CameraSession
+from ..models import EyeExamRegister
 
 
-class CameraSessionForm(forms.ModelForm):
+class EyeExamRegisterForm(forms.ModelForm):
     def clean(self) -> dict:
         cleaned_data = super().clean()
         registered_subject = cleaned_data.get("registered_subject")
@@ -28,5 +28,5 @@ class CameraSessionForm(forms.ModelForm):
         return cleaned_data
 
     class Meta:
-        model = CameraSession
+        model = EyeExamRegister
         fields = "__all__"

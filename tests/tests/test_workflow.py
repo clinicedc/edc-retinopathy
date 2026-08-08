@@ -1,6 +1,6 @@
 """End-to-end workflow tests simulating the camera's protocol.
 
-Flow: clinician creates CameraSession in EDC → camera resolves →
+Flow: clinician creates EyeExamRegister in EDC → camera resolves →
 camera uploads files → status shows complete.
 """
 
@@ -72,7 +72,7 @@ class FullWorkflowTests(RetinopathyTestCaseMixin):
 
     def test_full_workflow_combined(self) -> None:
         """Resolve, upload left, right, report for combined report type."""
-        session = self.create_camera_session(
+        session = self.create_eye_exam_register(
             self.rs,
             report_type=REPORT_TYPE_COMBINED,
         )
@@ -83,12 +83,12 @@ class FullWorkflowTests(RetinopathyTestCaseMixin):
 
         # Step 1: Resolve
         resolve_data = self._resolve()
-        self.assertEqual(resolve_data["camera_session_id"], session.pk)
+        self.assertEqual(resolve_data["eye_exam_register_id"], session.pk)
         self.assertEqual(resolve_data["uploaded"], [])
 
         # Step 2: Left eye
         left_data = self._upload("105-10-0001-2", "left")
-        self.assertEqual(str(left_data["camera_session_id"]), str(session.pk))
+        self.assertEqual(str(left_data["eye_exam_register_id"]), str(session.pk))
         self.assertEqual(left_data["file_type"], "left")
 
         # Check status mid-workflow
@@ -100,11 +100,11 @@ class FullWorkflowTests(RetinopathyTestCaseMixin):
 
         # Step 3: Right eye
         right_data = self._upload("105-10-0001-2", "right")
-        self.assertEqual(str(right_data["camera_session_id"]), str(session.pk))
+        self.assertEqual(str(right_data["eye_exam_register_id"]), str(session.pk))
 
         # Step 4: Report
         report_data = self._upload("105-10-0001-2", "report")
-        self.assertEqual(str(report_data["camera_session_id"]), str(session.pk))
+        self.assertEqual(str(report_data["eye_exam_register_id"]), str(session.pk))
 
         # Verify final state
         self.assertEqual(SessionFile.objects.count(), 3)
@@ -125,17 +125,17 @@ class FullWorkflowTests(RetinopathyTestCaseMixin):
 
     def test_full_workflow_per_eye(self) -> None:
         """Resolve, upload left, right, left_report, right_report."""
-        session = self.create_camera_session(
+        session = self.create_eye_exam_register(
             self.rs,
             report_type=REPORT_TYPE_PER_EYE,
         )
 
         resolve_data = self._resolve()
-        self.assertEqual(resolve_data["camera_session_id"], session.pk)
+        self.assertEqual(resolve_data["eye_exam_register_id"], session.pk)
 
         for ft in ("left", "right", "left_report", "right_report"):
             data = self._upload("105-10-0001-2", ft)
-            self.assertEqual(str(data["camera_session_id"]), str(session.pk))
+            self.assertEqual(str(data["eye_exam_register_id"]), str(session.pk))
 
         self.assertEqual(session.files.count(), 4)
 
@@ -151,20 +151,20 @@ class FullWorkflowTests(RetinopathyTestCaseMixin):
             initials="AB",
             gender="F",
         )
-        session1 = self.create_camera_session(self.rs)
-        session2 = self.create_camera_session(rs2)
+        session1 = self.create_eye_exam_register(self.rs)
+        session2 = self.create_eye_exam_register(rs2)
 
         # Resolve both
         r1 = self._resolve("105-10-0001-2", "JD", "M")
         r2 = self._resolve("105-10-0002-3", "AB", "F")
-        self.assertEqual(r1["camera_session_id"], session1.pk)
-        self.assertEqual(r2["camera_session_id"], session2.pk)
+        self.assertEqual(r1["eye_exam_register_id"], session1.pk)
+        self.assertEqual(r2["eye_exam_register_id"], session2.pk)
 
         # Upload left eye for both
         d1 = self._upload("105-10-0001-2", "left")
         d2 = self._upload("105-10-0002-3", "left")
-        self.assertEqual(str(d1["camera_session_id"]), str(session1.pk))
-        self.assertEqual(str(d2["camera_session_id"]), str(session2.pk))
+        self.assertEqual(str(d1["eye_exam_register_id"]), str(session1.pk))
+        self.assertEqual(str(d2["eye_exam_register_id"]), str(session2.pk))
 
         # Each session has exactly one file
         self.assertEqual(session1.files.count(), 1)
@@ -172,7 +172,7 @@ class FullWorkflowTests(RetinopathyTestCaseMixin):
 
     def test_workflow_reactivation_after_disconnect(self) -> None:
         """Camera disconnects mid-workflow, reconnects, and resumes."""
-        session = self.create_camera_session(self.rs)
+        session = self.create_eye_exam_register(self.rs)
 
         # Resolve and upload left eye
         self._resolve()
@@ -180,7 +180,7 @@ class FullWorkflowTests(RetinopathyTestCaseMixin):
 
         # Camera disconnects ... reconnects and resolves again
         r2 = self._resolve()
-        self.assertEqual(r2["camera_session_id"], session.pk)
+        self.assertEqual(r2["eye_exam_register_id"], session.pk)
         self.assertIn("left", r2["uploaded"])
 
         # Check status shows what was already uploaded
@@ -200,7 +200,7 @@ class FullWorkflowTests(RetinopathyTestCaseMixin):
 
     def test_workflow_multiple_files_per_eye(self) -> None:
         """Camera uploads multiple images for the same eye."""
-        self.create_camera_session(self.rs)
+        self.create_eye_exam_register(self.rs)
         self._resolve()
 
         f1 = SimpleUploadedFile(
@@ -230,7 +230,7 @@ class FullWorkflowTests(RetinopathyTestCaseMixin):
 
     def test_workflow_complete_then_new_session_needed(self) -> None:
         """After completing, resolve returns no_eligible_session."""
-        session = self.create_camera_session(self.rs)
+        session = self.create_eye_exam_register(self.rs)
         self._resolve()
 
         for ft in session.expected_file_types:
@@ -253,7 +253,7 @@ class FullWorkflowTests(RetinopathyTestCaseMixin):
 
     def test_workflow_with_capture_datetime(self) -> None:
         """Full workflow with distinct capture_datetime on each image."""
-        self.create_camera_session(self.rs)
+        self.create_eye_exam_register(self.rs)
         self._resolve()
 
         for file_type, dt in [
