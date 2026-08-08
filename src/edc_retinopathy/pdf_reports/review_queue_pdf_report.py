@@ -16,17 +16,23 @@ from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.units import cm
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
-from ..models import CameraSession, DmRetinopathyScreening, SessionFile
+from ..models import DmRetinopathyScreening, EyeExamRegister, SessionFile
 
 _TITLE = "DICOM Review Queue"
 
 _HEADER_STYLE = ParagraphStyle(
-    "col_header", fontSize=8, alignment=TA_LEFT, fontName="Helvetica-Bold",
+    "col_header",
+    fontSize=8,
+    alignment=TA_LEFT,
+    fontName="Helvetica-Bold",
 )
 _CELL_STYLE = ParagraphStyle("cell", fontSize=7, alignment=TA_LEFT, leading=9)
 _CELL_RIGHT = ParagraphStyle("cell_r", fontSize=7, alignment=TA_RIGHT, leading=9)
 _SECTION_STYLE = ParagraphStyle(
-    "section", fontSize=10, alignment=TA_LEFT, fontName="Helvetica-Bold",
+    "section",
+    fontSize=10,
+    alignment=TA_LEFT,
+    fontName="Helvetica-Bold",
 )
 _ALT_ROW = colors.Color(0.95, 0.95, 0.95)
 
@@ -58,7 +64,7 @@ def _review_status(*, reviewed: bool, uploaded: bool) -> str:
 class ReviewQueueReport(Report):
     """PDF of the DICOM review queue, for distribution by email.
 
-    Covers all camera sessions (ordered by subject_identifier) so that the
+    Covers all eye exam registrations (ordered by subject_identifier) so that the
     "Reviewed" status can be shown alongside those awaiting or ready for review.
     Every page carries the trial name and CONFIDENTIAL in the header and footer.
     """
@@ -85,25 +91,37 @@ class ReviewQueueReport(Report):
         # Sit CONFIDENTIAL above the centred "Page x of y" drawn by NumberedCanvas.
         canvas.drawCentredString(width / 2.0, self.footer_row_height + 10, "CONFIDENTIAL")
         canvas.drawRightString(
-            width - 35, self.footer_row_height, f"printed on {timestamp}",
+            width - 35,
+            self.footer_row_height,
+            f"printed on {timestamp}",
         )
 
     def get_report_story(self, document_template: SimpleDocTemplate = None, **kwargs):  # noqa: ARG002
         story = [
-            Table([[
-                Paragraph(
-                    _TITLE.upper(),
-                    ParagraphStyle(
-                        "title", fontSize=11, alignment=TA_LEFT, fontName="Helvetica-Bold",
-                    ),
-                ),
-                Paragraph(
-                    self.protocol_name.upper(),
-                    ParagraphStyle(
-                        "title_r", fontSize=11, alignment=TA_RIGHT, fontName="Helvetica-Bold",
-                    ),
-                ),
-            ]]),
+            Table(
+                [
+                    [
+                        Paragraph(
+                            _TITLE.upper(),
+                            ParagraphStyle(
+                                "title",
+                                fontSize=11,
+                                alignment=TA_LEFT,
+                                fontName="Helvetica-Bold",
+                            ),
+                        ),
+                        Paragraph(
+                            self.protocol_name.upper(),
+                            ParagraphStyle(
+                                "title_r",
+                                fontSize=11,
+                                alignment=TA_RIGHT,
+                                fontName="Helvetica-Bold",
+                            ),
+                        ),
+                    ]
+                ]
+            ),
             Spacer(0.1 * cm, 0.4 * cm),
         ]
         rows = self._build_rows()
@@ -134,7 +152,10 @@ class ReviewQueueReport(Report):
 
     @staticmethod
     def _counts_table(
-        title: str, order: tuple[str, ...], counts: Counter, total: int,
+        title: str,
+        order: tuple[str, ...],
+        counts: Counter,
+        total: int,
     ) -> Table:
         data = [[Paragraph(title, _HEADER_STYLE), Paragraph("Count", _HEADER_STYLE)]]
         data += [
@@ -144,27 +165,31 @@ class ReviewQueueReport(Report):
         data.append([Paragraph("Total", _HEADER_STYLE), Paragraph(str(total), _HEADER_STYLE)])
         table = Table(data, colWidths=[4.5 * cm, 2.0 * cm])
         last = len(data) - 1
-        table.setStyle(TableStyle([
-            ("GRID", (0, 0), (-1, -1), 0.5, colors.black),
-            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-            ("FONTNAME", (0, last), (-1, last), "Helvetica-Bold"),
-            ("BACKGROUND", (0, last), (-1, last), _ALT_ROW),
-            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-            ("FONTSIZE", (0, 0), (-1, -1), 7),
-        ]))
+        table.setStyle(
+            TableStyle(
+                [
+                    ("GRID", (0, 0), (-1, -1), 0.5, colors.black),
+                    ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                    ("FONTNAME", (0, last), (-1, last), "Helvetica-Bold"),
+                    ("BACKGROUND", (0, last), (-1, last), _ALT_ROW),
+                    ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                    ("FONTSIZE", (0, 0), (-1, -1), 7),
+                ]
+            )
+        )
         return table
 
     def _build_rows(self) -> list[dict]:
         has_dicoms = Exists(
             SessionFile.objects.filter(
-                camera_session=OuterRef("pk"),
+                eye_exam_register=OuterRef("pk"),
                 file_type__in=("left_dicom", "right_dicom"),
             ),
         )
         has_screening = Exists(
-            DmRetinopathyScreening.objects.filter(camera_session=OuterRef("pk")),
+            DmRetinopathyScreening.objects.filter(eye_exam_register=OuterRef("pk")),
         )
-        queryset = CameraSession.objects.annotate(
+        queryset = EyeExamRegister.objects.annotate(
             uploaded=has_dicoms,
             reviewed=has_screening,
             od_dicom_count=Count("files", filter=Q(files__file_type="right_dicom")),
@@ -180,12 +205,14 @@ class ReviewQueueReport(Report):
                     "%Y-%m-%d %H:%M",
                 ),
                 "uploaded": _uploaded_label(
-                    session.od_dicom_count, session.os_dicom_count,
+                    session.od_dicom_count,
+                    session.os_dicom_count,
                 ),
                 "od": str(session.od_dicom_count),
                 "os": str(session.os_dicom_count),
                 "review": _review_status(
-                    reviewed=session.reviewed, uploaded=session.uploaded,
+                    reviewed=session.reviewed,
+                    uploaded=session.uploaded,
                 ),
             }
             for session in queryset
@@ -194,7 +221,13 @@ class ReviewQueueReport(Report):
     @staticmethod
     def _table(rows: list[dict]) -> Table:
         col_widths = [
-            3.5 * cm, 3.5 * cm, 3.0 * cm, 2.5 * cm, 1.5 * cm, 1.5 * cm, 3.5 * cm,
+            3.5 * cm,
+            3.5 * cm,
+            3.0 * cm,
+            2.5 * cm,
+            1.5 * cm,
+            1.5 * cm,
+            3.5 * cm,
         ]
         header = [
             Paragraph("Subject", _HEADER_STYLE),
@@ -205,25 +238,32 @@ class ReviewQueueReport(Report):
             Paragraph("OS", _HEADER_STYLE),
             Paragraph("Review", _HEADER_STYLE),
         ]
-        data = [header, *(
-            [
-                Paragraph(row["subject_identifier"], _CELL_STYLE),
-                Paragraph(row["site"], _CELL_STYLE),
-                Paragraph(row["report_datetime"], _CELL_STYLE),
-                Paragraph(row["uploaded"], _CELL_STYLE),
-                Paragraph(row["od"], _CELL_STYLE),
-                Paragraph(row["os"], _CELL_STYLE),
-                Paragraph(row["review"], _CELL_STYLE),
-            ]
-            for row in rows
-        )]
+        data = [
+            header,
+            *(
+                [
+                    Paragraph(row["subject_identifier"], _CELL_STYLE),
+                    Paragraph(row["site"], _CELL_STYLE),
+                    Paragraph(row["report_datetime"], _CELL_STYLE),
+                    Paragraph(row["uploaded"], _CELL_STYLE),
+                    Paragraph(row["od"], _CELL_STYLE),
+                    Paragraph(row["os"], _CELL_STYLE),
+                    Paragraph(row["review"], _CELL_STYLE),
+                ]
+                for row in rows
+            ),
+        ]
         table = Table(data, colWidths=col_widths, repeatRows=1)
-        table.setStyle(TableStyle([
-            ("BACKGROUND", (0, 0), (-1, 0), colors.white),
-            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-            ("GRID", (0, 0), (-1, -1), 0.5, colors.black),
-            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-            ("FONTSIZE", (0, 1), (-1, -1), 7),
-            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, _ALT_ROW]),
-        ]))
+        table.setStyle(
+            TableStyle(
+                [
+                    ("BACKGROUND", (0, 0), (-1, 0), colors.white),
+                    ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                    ("GRID", (0, 0), (-1, -1), 0.5, colors.black),
+                    ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                    ("FONTSIZE", (0, 1), (-1, -1), 7),
+                    ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, _ALT_ROW]),
+                ]
+            )
+        )
         return table

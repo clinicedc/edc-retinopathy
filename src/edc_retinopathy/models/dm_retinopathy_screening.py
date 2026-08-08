@@ -8,7 +8,7 @@ from edc_prn.prn_model_manager import PrnModelManager
 from edc_sites.managers import CurrentSiteManager
 from edc_sites.model_mixins import SiteModelMixin
 
-from edc_retinopathy.models import CameraSession
+from .eye_exam_register import EyeExamRegister
 
 
 def evaluation_fields_factory_mixin(laterality: str) -> type[models.Model]:
@@ -69,7 +69,7 @@ class DmRetinopathyScreening(
 ):
     """
     Stores data from a remote or image-only diabetic retinopathy screening
-    conducted exclusively via fundus camera photographs.
+    conducted exclusively via fundus Eye Exam photographs.
     """
 
     class ImageQuality(models.TextChoices):
@@ -95,7 +95,7 @@ class DmRetinopathyScreening(
         NOT_EVALUATED = "Not evaluated"
 
     # --- Metadata & Auditing ---
-    camera_session = models.OneToOneField(CameraSession, on_delete=models.PROTECT)
+    eye_exam_register = models.OneToOneField(EyeExamRegister, on_delete=models.PROTECT)
 
     report_datetime = models.DateTimeField(default=timezone.now)
 
@@ -166,12 +166,12 @@ class DmRetinopathyScreening(
 
     def __str__(self):
         return (
-            f"{self.camera_session.subject_identifier} - "
+            f"{self.eye_exam_register.subject_identifier} - "
             f"Grade: {self.get_final_severity_grade_display()}"
         )
 
     def save(self, *args, **kwargs):
-        self.subject_identifier = self.camera_session.subject_identifier
+        self.subject_identifier = self.eye_exam_register.subject_identifier
         super().save(*args, **kwargs)
 
     class Meta(BaseUuidModel.Meta):

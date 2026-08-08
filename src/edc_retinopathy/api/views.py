@@ -18,7 +18,8 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from ..dicom_preview import convert_dicom_to_jpeg
-from ..models import CameraSession, SessionFile
+from ..models import EyeExamRegister, SessionFile
+from ..utils import get_storage_dir
 from .serializers import FileUploadSerializer, ResolveSubjectSerializer
 
 if TYPE_CHECKING:
@@ -42,6 +43,8 @@ _DICOM_FILE_TYPES = frozenset({"left_dicom", "right_dicom"})
 
 # Default settings
 _DEFAULT_MAX_FILE_SIZE_MB = 10
+
+
 def _get_max_file_size_bytes() -> int:
     mb = getattr(
         settings,
@@ -49,11 +52,6 @@ def _get_max_file_size_bytes() -> int:
         _DEFAULT_MAX_FILE_SIZE_MB,
     )
     return int(mb * 1024 * 1024)
-
-
-def _get_storage_dir() -> Path:
-    base = Path(settings.EDC_RETINOPATHY_STORAGE_DIR).expanduser()
-    return base / "images"
 
 
 def _validate_file_content(uploaded_file, file_type: str) -> str | None:
@@ -110,19 +108,19 @@ def _compute_sha256_uploaded(uploaded_file) -> str:
 def _duplicate_upload_response(
     subject_identifier: str,
     file_type: str,
-    camera_session_obj: CameraSession,
+    eye_exam_register_obj: EyeExamRegister,
     uploaded_file,
 ) -> Response | None:
     """Handle a retry of a file already stored for this session.
 
     A retried upload (e.g. the client timed out waiting for a response
     that was in fact sent) would otherwise hit the unique constraint on
-    (camera_session, original_filename) and crash with an uncaught
+    (eye_exam_register, original_filename) and crash with an uncaught
     IntegrityError. Returns a Response if *uploaded_file* is a duplicate
     (identical or conflicting) of an existing SessionFile, else None.
     """
     existing = SessionFile.objects.filter(
-        camera_session=camera_session_obj,
+        eye_exam_register=eye_exam_register_obj,
         original_filename=uploaded_file.name,
     ).first()
     if existing is None:
@@ -131,11 +129,10 @@ def _duplicate_upload_response(
     incoming_checksum = _compute_sha256_uploaded(uploaded_file)
     if incoming_checksum == existing.checksum:
         logger.info(
-            "Duplicate upload for %s/%s session=%s ignored "
-            "(already stored, checksum match).",
+            "Duplicate upload for %s/%s session=%s ignored (already stored, checksum match).",
             subject_identifier,
             file_type,
-            camera_session_obj.pk,
+            eye_exam_register_obj.pk,
         )
         return Response(_image_response_data(existing), status=status.HTTP_200_OK)
 
@@ -144,7 +141,7 @@ def _duplicate_upload_response(
         "with a different checksum.",
         subject_identifier,
         file_type,
-        camera_session_obj.pk,
+        eye_exam_register_obj.pk,
         uploaded_file.name,
     )
     return Response(
@@ -163,7 +160,7 @@ def _image_response_data(session_file: SessionFile) -> dict:
     """Build the standard response payload for a SessionFile."""
     return {
         "id": str(session_file.pk),
-        "camera_session_id": session_file.camera_session_id,
+        "eye_exam_register_id": session_file.eye_exam_register_id,
         "file_type": session_file.file_type,
         "original_filename": session_file.original_filename,
         "stored_filename": session_file.stored_filename,
@@ -171,22 +168,22 @@ def _image_response_data(session_file: SessionFile) -> dict:
     }
 
 
-def _find_camera_session(
+def _find_eye_exam_register(
     subject_identifier: str,
-    camera_session_id: str | None = None,
-) -> CameraSession | None:
+    eye_exam_register_id: str | None = None,
+) -> EyeExamRegister | None:
     """Find a session by subject_identifier.
 
-    If camera_session_id is provided, look up that specific session.
+    If eye_exam_register_id is provided, look up that specific session.
     Otherwise find the most recent session for the subject.
     """
-    if camera_session_id is not None:
-        return CameraSession.objects.filter(
-            pk=camera_session_id,
+    if eye_exam_register_id is not None:
+        return EyeExamRegister.objects.filter(
+            pk=eye_exam_register_id,
             subject_identifier=subject_identifier,
         ).first()
     return (
-        CameraSession.objects.filter(
+        EyeExamRegister.objects.filter(
             subject_identifier=subject_identifier,
         )
         .order_by("-report_datetime")
@@ -194,23 +191,25 @@ def _find_camera_session(
     )
 
 
-def _resolve_camera_session_or_error(
+def _resolve_eye_exam_register_or_error(
     subject_identifier: str,
-    camera_session_id: str | None,
-) -> tuple[CameraSession | None, Response | None]:
-    """Resolve the target CameraSession, or build a 404 error Response."""
-    camera_session_obj = _find_camera_session(
+    eye_exam_register_id: str | None,
+) -> tuple[EyeExamRegister | None, Response | None]:
+    """Resolve the target EyeExamRegister, or build a 404 error Response."""
+    eye_exam_register_obj = _find_eye_exam_register(
         subject_identifier,
-        camera_session_id=camera_session_id,
+        eye_exam_register_id=eye_exam_register_id,
     )
-    if camera_session_obj:
-        return camera_session_obj, None
-    if camera_session_id:
-        error_msg = f"Session {camera_session_id} not found for subject {subject_identifier}."
+    if eye_exam_register_obj:
+        return eye_exam_register_obj, None
+    if eye_exam_register_id:
+        error_msg = (
+            f"Session {eye_exam_register_id} not found for subject {subject_identifier}."
+        )
     else:
         error_msg = (
             f"No session found for subject {subject_identifier}. "
-            "Create a CameraSession in the EDC first."
+            "Create a EyeExamRegister in the EDC first."
         )
     return None, Response(
         {"code": "no_session", "error": error_msg},
@@ -243,14 +242,14 @@ class PingView(APIView):
 
 
 class ResolveSubjectView(APIView):
-    """Confirm that a CameraSession exists for a subject.
+    """Confirm that a EyeExamRegister exists for a subject.
 
     POST /api/retinopathy/resolve/
 
-    A CameraSession must be created in the EDC by the clinician before
+    A EyeExamRegister must be created in the EDC by the clinician before
     the camera exam.  This endpoint confirms that at least one eligible
     (non-complete, non-contraindicated) session exists and returns its
-    ``camera_session_id``.
+    ``eye_exam_register_id``.
     """
 
     authentication_classes = (TokenAuthentication,)
@@ -266,23 +265,23 @@ class ResolveSubjectView(APIView):
         device_id = data.get("device_id", "")
 
         # --- Find the most recent eligible session ---
-        qs: QuerySet[CameraSession] = CameraSession.objects.filter(
+        qs: QuerySet[EyeExamRegister] = EyeExamRegister.objects.filter(
             subject_identifier=subject_identifier,
         ).order_by("-report_datetime")
 
-        camera_session_obj = None
+        eye_exam_register_obj = None
         for obj in qs:
             if obj.contraindicated:
                 continue
             if obj.is_complete:
                 continue
-            camera_session_obj = obj
+            eye_exam_register_obj = obj
             break
 
-        if camera_session_obj is None:
+        if eye_exam_register_obj is None:
             if not qs.exists():
                 logger.warning(
-                    "No camera session for %s (device=%s). "
+                    "No entry in the Eye Exam Registerf for %s (device=%s). "
                     "Create one in the EDC before the exam.",
                     subject_identifier,
                     device_id,
@@ -291,7 +290,7 @@ class ResolveSubjectView(APIView):
                     {
                         "code": "no_session",
                         "error": (
-                            "No camera session found for this subject. "
+                            "No entry found in the Eye Exam Register for this subject. "
                             "Create one in the EDC before conducting "
                             "the exam."
                         ),
@@ -308,25 +307,25 @@ class ResolveSubjectView(APIView):
                     "code": "no_eligible_session",
                     "error": (
                         "All sessions for this subject are complete or "
-                        "contraindicated. Create a new camera session in the "
-                        "EDC to upload again."
+                        "contraindicated. Create a new entry in the Eye Exam Register "
+                        "to upload again."
                     ),
                 },
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
         # --- Update device_id if the session doesn't have one ---
-        if device_id and not camera_session_obj.device_id:
-            camera_session_obj.device_id = device_id
-            camera_session_obj.save(update_fields=["device_id"])
+        if device_id and not eye_exam_register_obj.device_id:
+            eye_exam_register_obj.device_id = device_id
+            eye_exam_register_obj.save(update_fields=["device_id"])
 
         uploaded = sorted(
-            camera_session_obj.files.values_list("file_type", flat=True),
+            eye_exam_register_obj.files.values_list("file_type", flat=True),
         )
 
         logger.info(
             "Resolved session %s for %s (device=%s, uploaded=%s)",
-            camera_session_obj.pk,
+            eye_exam_register_obj.pk,
             subject_identifier,
             device_id,
             uploaded,
@@ -334,8 +333,8 @@ class ResolveSubjectView(APIView):
 
         return Response(
             {
-                "subject_identifier": camera_session_obj.subject_identifier,
-                "camera_session_id": camera_session_obj.pk,
+                "subject_identifier": eye_exam_register_obj.subject_identifier,
+                "eye_exam_register_id": eye_exam_register_obj.pk,
                 "uploaded": uploaded,
             },
             status=status.HTTP_200_OK,
@@ -343,10 +342,10 @@ class ResolveSubjectView(APIView):
 
 
 class SessionStatusView(APIView):
-    """Return the current camera_session_obj status for a subject.
+    """Return the current eye_exam_register_obj status for a subject.
 
     GET /api/retinopathy/<subject_identifier>/status/
-    Returns the most recent camera_session_obj and which file types have been received.
+    Returns the most recent eye_exam_register_obj and which file types have been received.
     """
 
     authentication_classes = (TokenAuthentication,)
@@ -357,14 +356,14 @@ class SessionStatusView(APIView):
         request: Request,  # noqa: ARG002
         subject_identifier: str,
     ) -> Response:
-        camera_session_obj = (
-            CameraSession.objects.filter(
+        eye_exam_register_obj = (
+            EyeExamRegister.objects.filter(
                 subject_identifier=subject_identifier,
             )
             .order_by("-report_datetime")
             .first()
         )
-        if not camera_session_obj:
+        if not eye_exam_register_obj:
             return Response(
                 {
                     "code": "no_session",
@@ -373,17 +372,17 @@ class SessionStatusView(APIView):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
-        uploaded = set(camera_session_obj.files.values_list("file_type", flat=True))
-        expected = camera_session_obj.expected_file_types
+        uploaded = set(eye_exam_register_obj.files.values_list("file_type", flat=True))
+        expected = eye_exam_register_obj.expected_file_types
 
         return Response(
             {
-                "camera_session_id": camera_session_obj.pk,
-                "subject_identifier": camera_session_obj.subject_identifier,
-                "report_datetime": camera_session_obj.report_datetime.isoformat(),
+                "eye_exam_register_id": eye_exam_register_obj.pk,
+                "subject_identifier": eye_exam_register_obj.subject_identifier,
+                "report_datetime": eye_exam_register_obj.report_datetime.isoformat(),
                 "uploaded": sorted(uploaded),
                 "missing": sorted(expected - uploaded),
-                "complete": camera_session_obj.is_complete,
+                "complete": eye_exam_register_obj.is_complete,
             },
             status=status.HTTP_200_OK,
         )
@@ -397,7 +396,7 @@ class FileUploadView(APIView):
     POST /api/retinopathy/<subject_identifier>/report/
 
     Query params:
-        camera_session_id (optional): Target a specific camera_session_obj instead of the
+        eye_exam_register_id (optional): Target a specific eye_exam_register_obj instead of the
             most recent one. Useful after reconnection.
 
     Body: multipart/form-data with 'file', 'capture_datetime', and
@@ -466,12 +465,12 @@ class FileUploadView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # --- Find camera_session_obj (by explicit camera_session_id or most recent) ---
-        camera_session_id = request.query_params.get("camera_session_id") or None
+        # --- Find eye_exam_register_obj (by explicit eye_exam_register_id or most recent) ---
+        eye_exam_register_id = request.query_params.get("eye_exam_register_id") or None
 
-        camera_session_obj, error_response = _resolve_camera_session_or_error(
+        eye_exam_register_obj, error_response = _resolve_eye_exam_register_or_error(
             subject_identifier,
-            camera_session_id,
+            eye_exam_register_id,
         )
         if error_response is not None:
             return error_response
@@ -480,17 +479,17 @@ class FileUploadView(APIView):
         duplicate_response = _duplicate_upload_response(
             subject_identifier,
             file_type,
-            camera_session_obj,
+            eye_exam_register_obj,
             uploaded_file,
         )
         if duplicate_response is not None:
             return duplicate_response
 
         # --- Save file under session subdirectory with original filename ---
-        session_dir = _get_storage_dir() / str(camera_session_obj.pk)
+        session_dir = get_storage_dir() / str(eye_exam_register_obj.pk)
         session_dir.mkdir(parents=True, exist_ok=True)
         original_filename = uploaded_file.name
-        stored_filename = f"{camera_session_obj.pk}/{original_filename}"
+        stored_filename = f"{eye_exam_register_obj.pk}/{original_filename}"
         dest = session_dir / original_filename
 
         fd, tmp_path = tempfile.mkstemp(
@@ -509,7 +508,7 @@ class FileUploadView(APIView):
                 "Failed to write %s for %s session=%s",
                 file_type,
                 subject_identifier,
-                camera_session_obj.pk,
+                eye_exam_register_obj.pk,
             )
             return Response(
                 {
@@ -530,7 +529,7 @@ class FileUploadView(APIView):
                 "Checksum mismatch for %s/%s session=%s: expected %s, got %s",
                 subject_identifier,
                 file_type,
-                camera_session_obj.pk,
+                eye_exam_register_obj.pk,
                 checksum.lower(),
                 stored_checksum,
             )
@@ -547,7 +546,7 @@ class FileUploadView(APIView):
             )
 
         session_file = SessionFile.objects.create(
-            camera_session=camera_session_obj,
+            eye_exam_register=eye_exam_register_obj,
             file_type=file_type,
             original_filename=uploaded_file.name,
             stored_filename=stored_filename,
@@ -564,7 +563,7 @@ class FileUploadView(APIView):
                 preview_path = dest.parent / "previews" / preview_name
                 if convert_dicom_to_jpeg(dest, preview_path):
                     session_file.preview_filename = (
-                        f"{camera_session_obj.pk}/previews/{preview_name}"
+                        f"{eye_exam_register_obj.pk}/previews/{preview_name}"
                     )
                     session_file.save(update_fields=["preview_filename"])
             except Exception:  # noqa: BLE001
@@ -572,14 +571,14 @@ class FileUploadView(APIView):
                     "DICOM preview generation failed for %s session=%s — "
                     "upload accepted without preview",
                     subject_identifier,
-                    camera_session_obj.pk,
+                    eye_exam_register_obj.pk,
                 )
 
         logger.info(
             "Received %s for %s session=%s (%s bytes, stored=%s)",
             file_type,
             subject_identifier,
-            camera_session_obj.pk,
+            eye_exam_register_obj.pk,
             uploaded_file.size,
             stored_filename,
         )

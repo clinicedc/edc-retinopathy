@@ -6,9 +6,7 @@ edc-retinopathy
 Add a diabetic retinopathy screening form and REST API for integrating
 with a fundus camera in a clinicedc project.
 
-A clinician creates a **CameraSession** in the EDC before the exam.  The
-camera software (``fundus-camera-watchdog``) resolves the subject,
-uploads eye images, DICOM files and reports, then checks status.
+A clinician creates an **EyeExamRegister** instance in the EDC before the exam.  The camera software (``fundus-camera-watchdog``) resolves the subject, uploads eye images, DICOM files and reports, then checks status.
 
 Requires django>=5.2,<6.1 and djangorestframework>=3.16.0
 
@@ -21,11 +19,11 @@ All endpoints use ``TokenAuthentication``.
     Health check.  Returns ``{"status": "ok"}``.
 
 ``POST /api/retinopathy/resolve/``
-    Confirm a CameraSession exists for a subject.  Payload::
+    Confirm a EyeExamRegister exists for a subject.  Payload::
 
         {"subject_identifier": "105-10-0001-2"}
 
-    Returns ``200`` with ``camera_session_id`` and ``uploaded`` list, or
+    Returns ``200`` with ``eye_exam_register_id`` and ``uploaded`` list, or
     ``404`` if no session exists.
 
 ``POST /api/retinopathy/<subject_identifier>/<file_type>/``
@@ -46,7 +44,7 @@ All endpoints use ``TokenAuthentication``.
 Models
 ~~~~~~
 
-``CameraSession``
+``EyeExamRegister``
     Created by the clinician in the EDC.  Links to ``RegisteredSubject``
     and stores contra-indication screening fields, report type
     (combined / per-eye), and device ID.
@@ -64,6 +62,10 @@ Settings
 
 ``EDC_RETINOPATHY_MAX_FILE_SIZE_MB``
     Maximum upload size in MB (default: 10).
+
+``EDC_RETINOPATHY_VISIT_DATETIME_FILTER``
+    Datetime filter for Call List. If set, filters the list of subjects
+    to those who attended AFTER the given datetime.
 
 See also https://edc-retinopathy.readthedocs.io/en/latest/
 

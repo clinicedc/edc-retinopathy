@@ -5,100 +5,100 @@
 
 {{ block.super }}
 
-  <div class="col-sm-1">&nbsp;</div>
-  <div class="col-sm-10">
+<div class="col-sm-1">&nbsp;</div>
+<div class="col-sm-10">
 
     <div class="panel panel-default">
-      <div class="panel-heading">
-        <i class="fas fa-eye fa-lg fa-fw"></i>
-        Review: {{ camera_session.subject_identifier }}
-        <span class="text-muted">
-          &mdash; {{ camera_session.report_datetime|date:"Y-m-d H:i" }}
+        <div class="panel-heading">
+            <i class="fas fa-eye fa-lg fa-fw"></i>
+            Review: {{ eye_exam_register.subject_identifier }}
+            <span class="text-muted">
+          &mdash; {{ eye_exam_register.report_datetime|date:"Y-m-d H:i" }}
         </span>
-        <a href="{% url 'edc_retinopathy:review-queue' %}" class="pull-right">
-          <i class="fas fa-reply fa-fw"></i> Back to queue</a>
-      </div>
+            <a href="{% url 'edc_retinopathy:review-queue' %}" class="pull-right">
+                <i class="fas fa-reply fa-fw"></i> Back to queue</a>
+        </div>
     </div>
 
     <div class="row">
-      {# --- Right eye (OD) --- #}
-      <div class="col-sm-6">
-        <div class="panel panel-default">
-          <div class="panel-heading"><strong>Right eye (OD)</strong></div>
-          <div class="panel-body">
-            {% for f in od_files %}
-              <div class="text-center" style="margin-bottom: 15px;">
-                {% if f.preview_filename %}
-                  <img src="{% url 'edc_retinopathy:preview-image' f.pk %}"
-                       alt="{{ f.original_filename }}"
-                       class="img-responsive img-thumbnail"
-                       style="max-width: 100%;">
-                {% else %}
-                  <p class="text-muted">No preview available</p>
-                {% endif %}
-                <small class="text-muted">{{ f.original_filename }}</small>
-              </div>
-            {% empty %}
-              <p class="text-muted">No OD DICOM files.</p>
-            {% endfor %}
-            {% for f in od_images %}
-              <div class="text-center" style="margin-bottom: 15px;">
-                <img src="{% url 'edc_retinopathy:stored-image' f.pk %}"
-                     alt="{{ f.original_filename }}"
-                     class="img-responsive img-thumbnail"
-                     style="max-width: 100%;">
-                <small class="text-muted">{{ f.original_filename }}</small>
-              </div>
-            {% endfor %}
-          </div>
+        {# --- Right eye (OD) --- #}
+        <div class="col-sm-6">
+            <div class="panel panel-default">
+                <div class="panel-heading"><strong>Right eye (OD)</strong></div>
+                <div class="panel-body">
+                    {% for f in od_files %}
+                    <div class="text-center" style="margin-bottom: 15px;">
+                        {% if f.preview_filename %}
+                        <img src="{% url 'edc_retinopathy:preview-image' f.pk %}"
+                             alt="{{ f.original_filename }}"
+                             class="img-responsive img-thumbnail"
+                             style="max-width: 100%;">
+                        {% else %}
+                        <p class="text-muted">No preview available</p>
+                        {% endif %}
+                        <small class="text-muted">{{ f.original_filename }}</small>
+                    </div>
+                    {% empty %}
+                    <p class="text-muted">No OD DICOM files.</p>
+                    {% endfor %}
+                    {% for f in od_images %}
+                    <div class="text-center" style="margin-bottom: 15px;">
+                        <img src="{% url 'edc_retinopathy:stored-image' f.pk %}"
+                             alt="{{ f.original_filename }}"
+                             class="img-responsive img-thumbnail"
+                             style="max-width: 100%;">
+                        <small class="text-muted">{{ f.original_filename }}</small>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
         </div>
-      </div>
 
-      {# --- Left eye (OS) --- #}
-      <div class="col-sm-6">
-        <div class="panel panel-default">
-          <div class="panel-heading"><strong>Left eye (OS)</strong></div>
-          <div class="panel-body">
-            {% for f in os_files %}
-              <div class="text-center" style="margin-bottom: 15px;">
-                {% if f.preview_filename %}
-                  <img src="{% url 'edc_retinopathy:preview-image' f.pk %}"
-                       alt="{{ f.original_filename }}"
-                       class="img-responsive img-thumbnail"
-                       style="max-width: 100%;">
-                {% else %}
-                  <p class="text-muted">No preview available</p>
-                {% endif %}
-                <small class="text-muted">{{ f.original_filename }}</small>
-              </div>
-            {% empty %}
-              <p class="text-muted">No OS DICOM files.</p>
-            {% endfor %}
-            {% for f in os_images %}
-              <div class="text-center" style="margin-bottom: 15px;">
-                <img src="{% url 'edc_retinopathy:stored-image' f.pk %}"
-                     alt="{{ f.original_filename }}"
-                     class="img-responsive img-thumbnail"
-                     style="max-width: 100%;">
-                <small class="text-muted">{{ f.original_filename }}</small>
-              </div>
-            {% endfor %}
-          </div>
+        {# --- Left eye (OS) --- #}
+        <div class="col-sm-6">
+            <div class="panel panel-default">
+                <div class="panel-heading"><strong>Left eye (OS)</strong></div>
+                <div class="panel-body">
+                    {% for f in os_files %}
+                    <div class="text-center" style="margin-bottom: 15px;">
+                        {% if f.preview_filename %}
+                        <img src="{% url 'edc_retinopathy:preview-image' f.pk %}"
+                             alt="{{ f.original_filename }}"
+                             class="img-responsive img-thumbnail"
+                             style="max-width: 100%;">
+                        {% else %}
+                        <p class="text-muted">No preview available</p>
+                        {% endif %}
+                        <small class="text-muted">{{ f.original_filename }}</small>
+                    </div>
+                    {% empty %}
+                    <p class="text-muted">No OS DICOM files.</p>
+                    {% endfor %}
+                    {% for f in os_images %}
+                    <div class="text-center" style="margin-bottom: 15px;">
+                        <img src="{% url 'edc_retinopathy:stored-image' f.pk %}"
+                             alt="{{ f.original_filename }}"
+                             class="img-responsive img-thumbnail"
+                             style="max-width: 100%;">
+                        <small class="text-muted">{{ f.original_filename }}</small>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
         </div>
-      </div>
     </div>
 
     {# --- Action --- #}
     <div class="panel panel-default">
-      <div class="panel-body text-center">
-        <a href="{% url 'edc_retinopathy_admin:edc_retinopathy_dmretinopathyscreening_add' %}?camera_session={{ camera_session.pk }}&next=edc_retinopathy:review-queue"
-           class="btn btn-primary btn-lg">
-          <i class="fas fa-file-alt fa-fw"></i> Complete screening form
-        </a>
-      </div>
+        <div class="panel-body text-center">
+            <a href="{% url 'edc_retinopathy_admin:edc_retinopathy_dmretinopathyscreening_add' %}?eye_exam_register={{ eye_exam_register.pk }}&next=edc_retinopathy:review-queue"
+               class="btn btn-primary btn-lg">
+                <i class="fas fa-file-alt fa-fw"></i> Complete screening form
+            </a>
+        </div>
     </div>
 
-  </div>
-  <div class="col-sm-1">&nbsp;</div>
+</div>
+<div class="col-sm-1">&nbsp;</div>
 
 {% endblock main %}

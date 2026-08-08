@@ -10,12 +10,12 @@ from ..choices import FILE_CONTENT_TYPE_CHOICES, FILE_TYPE_CHOICES
 class SessionFile(BaseUuidModel):
     """Stores metadata for files received from the retinopathy camera.
 
-    Each file is linked to a CameraSession and categorized as
+    Each file is linked to an EyeExamRegister and categorized as
     a left-eye image, right-eye image, or report (PDF or HTML).
     """
 
-    camera_session = models.ForeignKey(
-        "edc_retinopathy.CameraSession",
+    eye_exam_register = models.ForeignKey(
+        "edc_retinopathy.EyeExamRegister",
         on_delete=models.PROTECT,
         related_name="files",
     )
@@ -82,7 +82,7 @@ class SessionFile(BaseUuidModel):
         verbose_name_plural = "Session files"
         constraints = (
             models.UniqueConstraint(
-                fields=["camera_session", "original_filename"],
+                fields=["eye_exam_register", "original_filename"],
                 name="unique_session_orig_filename",
             ),
         )

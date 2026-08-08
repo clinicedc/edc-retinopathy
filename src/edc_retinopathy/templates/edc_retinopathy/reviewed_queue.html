@@ -2,81 +2,84 @@
 {% load static %}
 
 {% block extrastyle %}{{ block.super }}
-  <link rel="stylesheet" href="https://cdn.datatables.net/1.11.5/css/jquery.dataTables.min.css">
-  <script src="https://cdn.datatables.net/1.11.5/js/jquery.dataTables.min.js"></script>
+<link rel="stylesheet" href="https://cdn.datatables.net/1.11.5/css/jquery.dataTables.min.css">
+<script src="https://cdn.datatables.net/1.11.5/js/jquery.dataTables.min.js"></script>
 {% endblock extrastyle %}
 
 {% block document_ready %}{{ block.super }}
-  <script>
+<script>
     $(document).ready(function () {
-      $('#reviewed_queue_table').DataTable({
-        order: [[1, 'desc']],
-        pageLength: 25,
-        columnDefs: [{orderable: false, targets: 5}]
-      });
+        $('#reviewed_queue_table').DataTable({
+            order: [[1, 'desc']],
+            pageLength: 25,
+            columnDefs: [{orderable: false, targets: 5}]
+        });
     });
-  </script>
+</script>
 {% endblock document_ready %}
 
 {% block main %}
 
 {{ block.super }}
 
-  <div class="col-sm-1">&nbsp;</div>
-  <div class="col-sm-10">
+<div class="col-sm-1">&nbsp;</div>
+<div class="col-sm-10">
     <div class="panel panel-default">
-      <div class="panel-heading">
-        <i class="fas fa-check-circle fa-lg fa-fw"></i> Reviewed Sessions
-        <span class="pull-right">
+        <div class="panel-heading">
+            <i class="fas fa-check-circle fa-lg fa-fw"></i> Reviewed Sessions
+            <span class="pull-right">
           <a href="{% url 'edc_retinopathy:review-queue' %}">
             <i class="fas fa-eye fa-fw"></i> Review queue</a>
+          &nbsp;|&nbsp;
+          <a href="{% url 'edc_retinopathy:call-list' %}">
+            <i class="fas fa-phone fa-fw"></i> Call list</a>
           &nbsp;|&nbsp;
           <a href="{% url 'edc_retinopathy:home_url' %}">
             <i class="fas fa-reply fa-fw"></i> Back</a>
         </span>
-      </div>
-      <div class="panel-body">
-        <table id="reviewed_queue_table" class="table table-striped table-hover">
-          <thead>
-            <tr>
-              <th>Subject</th>
-              <th>Session date</th>
-              <th>OD files</th>
-              <th>OS files</th>
-              <th>Screening</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for session in sessions %}
-            <tr>
-              <td>{{ session.subject_identifier }}</td>
-              <td data-order="{{ session.report_datetime|date:'U' }}">
-                <a href="{% url 'edc_retinopathy_admin:edc_retinopathy_camerasession_change' session.pk %}?next=edc_retinopathy:reviewed-queue">
-                  {{ session.report_datetime|date:"Y-m-d H:i" }}
-                </a>
-              </td>
-              <td>{{ session.od_dicom_count }}</td>
-              <td>{{ session.os_dicom_count }}</td>
-              <td>
-                {% if session.dmretinopathyscreening %}
-                  <a href="{% url 'edc_retinopathy_admin:edc_retinopathy_dmretinopathyscreening_change' session.dmretinopathyscreening.pk %}">
-                    {{ session.dmretinopathyscreening.get_final_severity_grade_display }}
-                  </a>
-                {% endif %}
-              </td>
-              <td>
-                <a href="{% url 'edc_retinopathy:review-detail' session.pk %}"
-                   class="btn btn-sm btn-default">
-                  <i class="fas fa-search fa-fw"></i> View</a>
-              </td>
-            </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
+        </div>
+        <div class="panel-body">
+            <table id="reviewed_queue_table" class="table table-striped table-hover">
+                <thead>
+                <tr>
+                    <th>Subject</th>
+                    <th>Session date</th>
+                    <th>OD files</th>
+                    <th>OS files</th>
+                    <th>Screening</th>
+                    <th></th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for session in sessions %}
+                <tr>
+                    <td>{{ session.subject_identifier }}</td>
+                    <td data-order="{{ session.report_datetime|date:'U' }}">
+                        <a href="{% url 'edc_retinopathy_admin:edc_retinopathy_eyeexamregister_change' session.pk %}?next=edc_retinopathy:reviewed-queue">
+                            {{ session.report_datetime|date:"Y-m-d H:i" }}
+                        </a>
+                    </td>
+                    <td>{{ session.od_dicom_count }}</td>
+                    <td>{{ session.os_dicom_count }}</td>
+                    <td>
+                        {% if session.dmretinopathyscreening %}
+                        <a href="{% url 'edc_retinopathy_admin:edc_retinopathy_dmretinopathyscreening_change' session.dmretinopathyscreening.pk %}">
+                            {{ session.dmretinopathyscreening.get_final_severity_grade_display }}
+                        </a>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <a href="{% url 'edc_retinopathy:review-detail' session.pk %}"
+                           class="btn btn-sm btn-default">
+                            <i class="fas fa-search fa-fw"></i> View</a>
+                    </td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
     </div>
-  </div>
-  <div class="col-sm-1">&nbsp;</div>
+</div>
+<div class="col-sm-1">&nbsp;</div>
 
 {% endblock main %}

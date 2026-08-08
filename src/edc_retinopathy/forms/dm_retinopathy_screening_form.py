@@ -54,7 +54,7 @@ class DmRetinopathyScreeningForm(FormValidatorMixin, forms.ModelForm):
     class Meta:
         model = DmRetinopathyScreening
         fields = (
-            "camera_session",
+            "eye_exam_register",
             "report_datetime",
             "interpreted_by",
             "image_quality",

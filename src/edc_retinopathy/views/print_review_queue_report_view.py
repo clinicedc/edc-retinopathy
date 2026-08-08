@@ -8,6 +8,8 @@ from reportlab.lib.units import cm
 
 from ..pdf_reports import ReviewQueueReport
 
+__all__ = ["print_review_queue_report_view"]
+
 
 @login_required
 def print_review_queue_report_view(request) -> HttpResponse:
