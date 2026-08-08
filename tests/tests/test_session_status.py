@@ -27,13 +27,13 @@ class SessionStatusTests(RetinopathyTestCaseMixin):
 
     def test_status_empty_session_combined(self) -> None:
         """Returns session with no uploads (combined report_type)."""
-        camera_session = self.create_camera_session(
+        eye_exam_register = self.create_eye_exam_register(
             self.rs,
             report_type=REPORT_TYPE_COMBINED,
         )
         response = self.client.get(self.url)
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(str(response.data["camera_session_id"]), str(camera_session.pk))
+        self.assertEqual(str(response.data["eye_exam_register_id"]), str(eye_exam_register.pk))
         self.assertEqual(response.data["uploaded"], [])
         self.assertEqual(
             sorted(response.data["missing"]),
@@ -43,13 +43,13 @@ class SessionStatusTests(RetinopathyTestCaseMixin):
 
     def test_status_empty_session_per_eye(self) -> None:
         """Returns session with no uploads (per_eye report_type)."""
-        camera_session = self.create_camera_session(
+        eye_exam_register = self.create_eye_exam_register(
             self.rs,
             report_type=REPORT_TYPE_PER_EYE,
         )
         response = self.client.get(self.url)
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(str(response.data["camera_session_id"]), str(camera_session.pk))
+        self.assertEqual(str(response.data["eye_exam_register_id"]), str(eye_exam_register.pk))
         self.assertEqual(
             sorted(response.data["missing"]),
             ["left", "left_report", "right", "right_report"],
@@ -57,12 +57,12 @@ class SessionStatusTests(RetinopathyTestCaseMixin):
 
     def test_status_partial_uploads(self) -> None:
         """Returns correct uploaded/missing after partial uploads."""
-        camera_session = self.create_camera_session(
+        eye_exam_register = self.create_eye_exam_register(
             self.rs,
             report_type=REPORT_TYPE_COMBINED,
         )
         SessionFile.objects.create(
-            camera_session=camera_session,
+            eye_exam_register=eye_exam_register,
             file_type="left",
             original_filename="left.jpg",
             stored_filename="abc123.jpg",
@@ -80,7 +80,7 @@ class SessionStatusTests(RetinopathyTestCaseMixin):
 
     def test_status_complete_session_combined(self) -> None:
         """Returns complete=True when all combined file types uploaded."""
-        camera_session = self.create_camera_session(
+        eye_exam_register = self.create_eye_exam_register(
             self.rs,
             report_type=REPORT_TYPE_COMBINED,
         )
@@ -90,7 +90,7 @@ class SessionStatusTests(RetinopathyTestCaseMixin):
             ("report", "report.html"),
         ]:
             SessionFile.objects.create(
-                camera_session=camera_session,
+                eye_exam_register=eye_exam_register,
                 file_type=ft,
                 original_filename=fn,
                 stored_filename=f"{ft}_stored.ext",
@@ -108,7 +108,7 @@ class SessionStatusTests(RetinopathyTestCaseMixin):
 
     def test_status_complete_session_per_eye(self) -> None:
         """Returns complete=True when all per_eye file types uploaded."""
-        camera_session = self.create_camera_session(
+        eye_exam_register = self.create_eye_exam_register(
             self.rs,
             report_type=REPORT_TYPE_PER_EYE,
         )
@@ -119,7 +119,7 @@ class SessionStatusTests(RetinopathyTestCaseMixin):
             ("right_report", "r_report.html"),
         ]:
             SessionFile.objects.create(
-                camera_session=camera_session,
+                eye_exam_register=eye_exam_register,
                 file_type=ft,
                 original_filename=fn,
                 stored_filename=f"{ft}_stored.ext",
@@ -131,10 +131,10 @@ class SessionStatusTests(RetinopathyTestCaseMixin):
 
     def test_status_uses_most_recent_session(self) -> None:
         """Returns the most recent session, not an older one."""
-        self.create_camera_session(self.rs)
-        newer = self.create_camera_session(self.rs)
+        self.create_eye_exam_register(self.rs)
+        newer = self.create_eye_exam_register(self.rs)
         response = self.client.get(self.url)
-        self.assertEqual(str(response.data["camera_session_id"]), str(newer.pk))
+        self.assertEqual(str(response.data["eye_exam_register_id"]), str(newer.pk))
         self.assertEqual(response.data["uploaded"], [])
 
     def test_status_unauthenticated(self) -> None:
@@ -145,7 +145,7 @@ class SessionStatusTests(RetinopathyTestCaseMixin):
 
     def test_status_includes_report_datetime(self) -> None:
         """Response includes report_datetime as ISO string."""
-        self.create_camera_session(self.rs)
+        self.create_eye_exam_register(self.rs)
         response = self.client.get(self.url)
         self.assertIn("report_datetime", response.data)
         self.assertIn("T", response.data["report_datetime"])

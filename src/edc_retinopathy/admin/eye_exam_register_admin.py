@@ -9,16 +9,16 @@ from edc_model_admin.history import SimpleHistoryAdmin
 from rangefilter.filters import DateRangeFilterBuilder
 
 from ..admin_site import edc_retinopathy_admin
-from ..forms import CameraSessionForm
-from ..models import CameraSession
+from ..forms import EyeExamRegisterForm
+from ..models import EyeExamRegister
 
 
-@admin.register(CameraSession, site=edc_retinopathy_admin)
-class CameraSessionAdmin(
+@admin.register(EyeExamRegister, site=edc_retinopathy_admin)
+class EyeExamRegisterAdmin(
     ModelAdminSubjectDashboardMixin,
     SimpleHistoryAdmin,
 ):
-    form = CameraSessionForm
+    form = EyeExamRegisterForm
 
     show_object_tools: bool = True
     show_cancel = True
@@ -90,7 +90,7 @@ class CameraSessionAdmin(
     search_fields = ("registered_subject__subject_identifier",)
 
     @admin.display(description="Files")
-    def file_count(self, obj: CameraSession) -> str:
+    def file_count(self, obj: EyeExamRegister) -> str:
         count = obj.files.count()
         if not count:
             return self.empty_value_display
@@ -103,7 +103,7 @@ class CameraSessionAdmin(
         )
 
     @admin.display(description="Eligible", boolean=True)
-    def eligible(self, obj: CameraSession) -> bool | None:
+    def eligible(self, obj: EyeExamRegister) -> bool | None:
         if obj.contraindicated is not None:
             return not obj.contraindicated
         return obj.contraindicated

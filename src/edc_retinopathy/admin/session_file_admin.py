@@ -57,11 +57,11 @@ class SessionFileAdmin(
     )
     search_fields = (
         "original_filename",
-        "camera_session__subject_identifier",
+        "eye_exam_register__subject_identifier",
     )
     readonly_fields = (
         "id",
-        "camera_session",
+        "eye_exam_register",
         "file_type",
         "original_filename",
         "stored_filename",
@@ -75,13 +75,13 @@ class SessionFileAdmin(
     @admin.display(description="Session")
     def session_link(self, obj: SessionFile) -> str:
         url = reverse(
-            "edc_retinopathy_admin:edc_retinopathy_camerasession_changelist",
+            "edc_retinopathy_admin:edc_retinopathy_eyeexamregister_changelist",
         )
         return format_html(
             '<a href="{}?id__exact={}">{}</a>',
             url,
-            obj.camera_session_id,
-            obj.camera_session,
+            obj.eye_exam_register_id,
+            obj.eye_exam_register,
         )
 
     @admin.display(description="Report")

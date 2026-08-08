@@ -123,11 +123,11 @@ def main() -> None:  # noqa: C901 PLR0912 PLR0915
     r = requests.post(f"{base}/resolve/", json=payload, headers=headers, timeout=10)
     if r.status_code in (STATUS_OK, STATUS_CODE_CREATED):
         data = r.json()
-        camera_session_id = data["camera_session_id"]
+        eye_exam_register_id = data["eye_exam_register_id"]
         reactivated = data.get("reactivated", False)
         label = "reactivated" if reactivated else "created"
         print(  # noqa T201
-            f"OK — {data['subject_identifier']}, session {camera_session_id} ({label})",
+            f"OK — {data['subject_identifier']}, session {eye_exam_register_id} ({label})",
         )
         if args.verbose:
             print(f"  Response: {json.dumps(data, indent=2)}")  # noqa T201
@@ -170,7 +170,7 @@ def main() -> None:  # noqa: C901 PLR0912 PLR0915
         if args.checksum:
             form_data["checksum"] = (None, sha256_bytes(file_data))
 
-        url = f"{base}/{args.subject}/{file_type}/?camera_session_id={camera_session_id}"
+        url = f"{base}/{args.subject}/{file_type}/?eye_exam_register_id={eye_exam_register_id}"
 
         if args.verbose:
             print()  # noqa T201
@@ -205,7 +205,7 @@ def main() -> None:  # noqa: C901 PLR0912 PLR0915
         data = r.json()
         print("OK")  # noqa T201
         print(f"  Subject:  {data['subject_identifier']}")  # noqa T201
-        print(f"  Session:  {data['camera_session_id']}")  # noqa T201
+        print(f"  Session:  {data['eye_exam_register_id']}")  # noqa T201
         print(f"  Uploaded: {data['uploaded']}")  # noqa T201
         print(f"  Missing:  {data['missing']}")  # noqa T201
         print(f"  Complete: {data['complete']}")  # noqa T201

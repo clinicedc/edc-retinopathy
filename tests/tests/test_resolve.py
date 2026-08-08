@@ -1,6 +1,6 @@
 """Tests for the resolve-subject endpoint.
 
-The camera calls resolve to confirm a CameraSession exists for the
+The camera calls resolve to confirm a EyeExamRegister exists for the
 subject before uploading files.
 """
 
@@ -10,7 +10,7 @@ from clinicedc_constants import YES
 from django.utils import timezone
 from rest_framework.test import APIClient
 
-from edc_retinopathy.models import CameraSession, SessionFile
+from edc_retinopathy.models import EyeExamRegister, SessionFile
 
 from .mixins import RetinopathyTestCaseMixin
 
@@ -21,7 +21,7 @@ class ResolveSubjectTests(RetinopathyTestCaseMixin):
     def setUp(self) -> None:
         super().setUp()
         self.rs = self.create_registered_subject()
-        self.camera_session = self.create_camera_session(self.rs)
+        self.eye_exam_register = self.create_eye_exam_register(self.rs)
         self.url = "/api/retinopathy/resolve/"
 
     # --- success ---
@@ -35,23 +35,23 @@ class ResolveSubjectTests(RetinopathyTestCaseMixin):
         )
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data["subject_identifier"], "105-10-0001-2")
-        self.assertIn("camera_session_id", response.data)
+        self.assertIn("eye_exam_register_id", response.data)
 
-    def test_resolve_returns_camera_session_id(self) -> None:
+    def test_resolve_returns_eye_exam_register_id(self) -> None:
         response = self.client.post(
             self.url,
             {"subject_identifier": "105-10-0001-2"},
             format="json",
         )
-        self.assertEqual(response.data["camera_session_id"], self.camera_session.pk)
+        self.assertEqual(response.data["eye_exam_register_id"], self.eye_exam_register.pk)
 
     def test_resolve_returns_uploaded_list(self) -> None:
         """Response includes list of already-uploaded file types."""
         SessionFile.objects.create(
-            camera_session=self.camera_session,
+            eye_exam_register=self.eye_exam_register,
             file_type="left",
             original_filename="l.jpg",
-            stored_filename=f"{self.camera_session.pk}/l.jpg",
+            stored_filename=f"{self.eye_exam_register.pk}/l.jpg",
             capture_datetime=timezone.now(),
         )
         response = self.client.post(
@@ -73,7 +73,7 @@ class ResolveSubjectTests(RetinopathyTestCaseMixin):
     # --- no session / ineligible ---
 
     def test_resolve_no_sessions_returns_404(self) -> None:
-        self.camera_session.delete()
+        self.eye_exam_register.delete()
         response = self.client.post(
             self.url,
             {"subject_identifier": "105-10-0001-2"},
@@ -83,12 +83,12 @@ class ResolveSubjectTests(RetinopathyTestCaseMixin):
         self.assertEqual(response.data["code"], "no_session")
 
     def test_resolve_all_complete_returns_400(self) -> None:
-        for ft in self.camera_session.expected_file_types:
+        for ft in self.eye_exam_register.expected_file_types:
             SessionFile.objects.create(
-                camera_session=self.camera_session,
+                eye_exam_register=self.eye_exam_register,
                 file_type=ft,
                 original_filename=f"{ft}.ext",
-                stored_filename=f"{self.camera_session.pk}/{ft}_stored.ext",
+                stored_filename=f"{self.eye_exam_register.pk}/{ft}_stored.ext",
                 capture_datetime=timezone.now(),
             )
         response = self.client.post(
@@ -100,7 +100,7 @@ class ResolveSubjectTests(RetinopathyTestCaseMixin):
         self.assertEqual(response.data["code"], "no_eligible_session")
 
     def test_resolve_all_contraindicated_returns_400(self) -> None:
-        CameraSession.objects.filter(pk=self.camera_session.pk).update(
+        EyeExamRegister.objects.filter(pk=self.eye_exam_register.pk).update(
             visual_impairment=YES,
         )
         response = self.client.post(
@@ -112,35 +112,35 @@ class ResolveSubjectTests(RetinopathyTestCaseMixin):
         self.assertEqual(response.data["code"], "no_eligible_session")
 
     def test_resolve_skips_contraindicated(self) -> None:
-        CameraSession.objects.filter(pk=self.camera_session.pk).update(
+        EyeExamRegister.objects.filter(pk=self.eye_exam_register.pk).update(
             visual_impairment=YES,
         )
-        eligible = self.create_camera_session(self.rs)
+        eligible = self.create_eye_exam_register(self.rs)
         response = self.client.post(
             self.url,
             {"subject_identifier": "105-10-0001-2"},
             format="json",
         )
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.data["camera_session_id"], eligible.pk)
+        self.assertEqual(response.data["eye_exam_register_id"], eligible.pk)
 
     def test_resolve_skips_complete(self) -> None:
-        for ft in self.camera_session.expected_file_types:
+        for ft in self.eye_exam_register.expected_file_types:
             SessionFile.objects.create(
-                camera_session=self.camera_session,
+                eye_exam_register=self.eye_exam_register,
                 file_type=ft,
                 original_filename=f"{ft}.ext",
-                stored_filename=f"{self.camera_session.pk}/{ft}_stored.ext",
+                stored_filename=f"{self.eye_exam_register.pk}/{ft}_stored.ext",
                 capture_datetime=timezone.now(),
             )
-        incomplete = self.create_camera_session(self.rs)
+        incomplete = self.create_eye_exam_register(self.rs)
         response = self.client.post(
             self.url,
             {"subject_identifier": "105-10-0001-2"},
             format="json",
         )
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.data["camera_session_id"], incomplete.pk)
+        self.assertEqual(response.data["eye_exam_register_id"], incomplete.pk)
 
     # --- required fields ---
 
@@ -162,22 +162,22 @@ class ResolveSubjectTests(RetinopathyTestCaseMixin):
     # --- device_id ---
 
     def test_resolve_sets_device_id(self) -> None:
-        self.assertEqual(self.camera_session.device_id, "")
+        self.assertEqual(self.eye_exam_register.device_id, "")
         self.client.post(
             self.url,
             {"subject_identifier": "105-10-0001-2", "device_id": "CAM-001"},
             format="json",
         )
-        self.camera_session.refresh_from_db()
-        self.assertEqual(self.camera_session.device_id, "CAM-001")
+        self.eye_exam_register.refresh_from_db()
+        self.assertEqual(self.eye_exam_register.device_id, "CAM-001")
 
     def test_resolve_does_not_overwrite_device_id(self) -> None:
-        self.camera_session.device_id = "CAM-001"
-        self.camera_session.save()
+        self.eye_exam_register.device_id = "CAM-001"
+        self.eye_exam_register.save()
         self.client.post(
             self.url,
             {"subject_identifier": "105-10-0001-2", "device_id": "CAM-999"},
             format="json",
         )
-        self.camera_session.refresh_from_db()
-        self.assertEqual(self.camera_session.device_id, "CAM-001")
+        self.eye_exam_register.refresh_from_db()
+        self.assertEqual(self.eye_exam_register.device_id, "CAM-001")

@@ -13,7 +13,7 @@ from django.test import override_settings
 from django.utils import timezone
 from rest_framework.test import APIClient
 
-from edc_retinopathy.models import CameraSession, SessionFile
+from edc_retinopathy.models import EyeExamRegister, SessionFile
 
 from .mixins import RetinopathyTestCaseMixin
 
@@ -74,7 +74,7 @@ class FileUploadBaseTestCase(RetinopathyTestCaseMixin):
     def setUp(self) -> None:
         super().setUp()
         self.rs = self.create_registered_subject()
-        self.camera_session = self.create_camera_session(self.rs)
+        self.eye_exam_register = self.create_eye_exam_register(self.rs)
         self.subject_id = "105-10-0001-2"
 
     def _upload_url(self, file_type: str) -> str:
@@ -90,7 +90,9 @@ class LeftEyeUploadTests(FileUploadBaseTestCase):
         )
         self.assertEqual(response.status_code, 201)
         self.assertEqual(response.data["file_type"], "left")
-        self.assertEqual(str(response.data["camera_session_id"]), str(self.camera_session.pk))
+        self.assertEqual(
+            str(response.data["eye_exam_register_id"]), str(self.eye_exam_register.pk)
+        )
         self.assertEqual(SessionFile.objects.count(), 1)
 
     def test_upload_left_eye_creates_session_file(self) -> None:
@@ -103,7 +105,7 @@ class LeftEyeUploadTests(FileUploadBaseTestCase):
             format="multipart",
         )
         img = SessionFile.objects.get()
-        self.assertEqual(img.camera_session, self.camera_session)
+        self.assertEqual(img.eye_exam_register, self.eye_exam_register)
         self.assertEqual(img.file_type, "left")
         self.assertEqual(img.original_filename, "left_eye_scan.jpg")
         self.assertTrue(img.stored_filename.endswith(".jpg"))
@@ -350,18 +352,18 @@ class FileUploadEdgeCaseTests(FileUploadBaseTestCase):
             )
             self.assertEqual(response.status_code, 201, f"Failed for {file_type}")
         self.assertEqual(SessionFile.objects.count(), 3)
-        self.assertEqual(self.camera_session.files.count(), 3)
+        self.assertEqual(self.eye_exam_register.files.count(), 3)
 
     def test_upload_uses_most_recent_session(self) -> None:
-        newer_camera_session = self.create_camera_session(self.rs)
+        newer_eye_exam_register = self.create_eye_exam_register(self.rs)
         self.client.post(
             self._upload_url("left"),
             {"file": _make_image_file(), "capture_datetime": CAPTURE_DT},
             format="multipart",
         )
         img = SessionFile.objects.get()
-        self.assertEqual(img.camera_session, newer_camera_session)
-        self.assertNotEqual(img.camera_session, self.camera_session)
+        self.assertEqual(img.eye_exam_register, newer_eye_exam_register)
+        self.assertNotEqual(img.eye_exam_register, self.eye_exam_register)
 
     def test_stored_filename_uses_original_name(self) -> None:
         """Stored filename is <session_pk>/<original_filename>."""
@@ -376,7 +378,7 @@ class FileUploadEdgeCaseTests(FileUploadBaseTestCase):
         img = SessionFile.objects.get()
         self.assertEqual(
             img.stored_filename,
-            f"{self.camera_session.pk}/fundus_OD_20260602.jpg",
+            f"{self.eye_exam_register.pk}/fundus_OD_20260602.jpg",
         )
 
     def test_file_extension_preserved(self) -> None:
@@ -446,7 +448,7 @@ class ChecksumTests(FileUploadBaseTestCase):
         session_dir = (
             Path(settings.EDC_RETINOPATHY_STORAGE_DIR)
             / "images"
-            / str(self.camera_session.pk)
+            / str(self.eye_exam_register.pk)
         )
         if session_dir.exists():
             self.assertEqual(
@@ -500,7 +502,9 @@ class DuplicateUploadTests(FileUploadBaseTestCase):
     def test_same_filename_different_content_returns_409(self) -> None:
         first_payload = {
             "file": SimpleUploadedFile(
-                "left.jpg", b"\xff\xd8\xff\xe0" + b"\x00" * 100, "image/jpeg",
+                "left.jpg",
+                b"\xff\xd8\xff\xe0" + b"\x00" * 100,
+                "image/jpeg",
             ),
             "capture_datetime": CAPTURE_DT,
         }
@@ -509,7 +513,9 @@ class DuplicateUploadTests(FileUploadBaseTestCase):
 
         conflicting_payload = {
             "file": SimpleUploadedFile(
-                "left.jpg", b"\xff\xd8\xff\xe0" + b"\x11" * 100, "image/jpeg",
+                "left.jpg",
+                b"\xff\xd8\xff\xe0" + b"\x11" * 100,
+                "image/jpeg",
             ),
             "capture_datetime": CAPTURE_DT,
         }
@@ -548,9 +554,9 @@ class DuplicateUploadTests(FileUploadBaseTestCase):
 
 class SessionIdParamTests(FileUploadBaseTestCase):
     def test_upload_to_specific_session(self) -> None:
-        older_camera_session = self.camera_session
-        self.create_camera_session(self.rs)
-        url = f"{self._upload_url('left')}?camera_session_id={older_camera_session.pk}"
+        older_eye_exam_register = self.eye_exam_register
+        self.create_eye_exam_register(self.rs)
+        url = f"{self._upload_url('left')}?eye_exam_register_id={older_eye_exam_register.pk}"
         response = self.client.post(
             url,
             {"file": _make_image_file(), "capture_datetime": CAPTURE_DT},
@@ -558,10 +564,10 @@ class SessionIdParamTests(FileUploadBaseTestCase):
         )
         self.assertEqual(response.status_code, 201)
         img = SessionFile.objects.get()
-        self.assertEqual(img.camera_session, older_camera_session)
+        self.assertEqual(img.eye_exam_register, older_eye_exam_register)
 
-    def test_invalid_camera_session_id_returns_404(self) -> None:
-        url = f"{self._upload_url('left')}?camera_session_id={_uuid.uuid4()}"
+    def test_invalid_eye_exam_register_id_returns_404(self) -> None:
+        url = f"{self._upload_url('left')}?eye_exam_register_id={_uuid.uuid4()}"
         response = self.client.post(
             url,
             {"file": _make_image_file(), "capture_datetime": CAPTURE_DT},
@@ -569,14 +575,14 @@ class SessionIdParamTests(FileUploadBaseTestCase):
         )
         self.assertEqual(response.status_code, 404)
 
-    def test_camera_session_id_wrong_subject_returns_404(self) -> None:
+    def test_eye_exam_register_id_wrong_subject_returns_404(self) -> None:
         rs2 = self.create_registered_subject(
             subject_identifier="105-10-0099-9",
             initials="ZZ",
             gender="F",
         )
-        other_camera_session = self.create_camera_session(rs2)
-        url = f"{self._upload_url('left')}?camera_session_id={other_camera_session.pk}"
+        other_eye_exam_register = self.create_eye_exam_register(rs2)
+        url = f"{self._upload_url('left')}?eye_exam_register_id={other_eye_exam_register.pk}"
         response = self.client.post(
             url,
             {"file": _make_image_file(), "capture_datetime": CAPTURE_DT},
@@ -584,12 +590,12 @@ class SessionIdParamTests(FileUploadBaseTestCase):
         )
         self.assertEqual(response.status_code, 404)
 
-    def test_camera_session_id_bypasses_expiry(self) -> None:
+    def test_eye_exam_register_id_bypasses_expiry(self) -> None:
         old_time = timezone.now() - timedelta(hours=12)
-        CameraSession.objects.filter(pk=self.camera_session.pk).update(
+        EyeExamRegister.objects.filter(pk=self.eye_exam_register.pk).update(
             report_datetime=old_time,
         )
-        url = f"{self._upload_url('left')}?camera_session_id={self.camera_session.pk}"
+        url = f"{self._upload_url('left')}?eye_exam_register_id={self.eye_exam_register.pk}"
         response = self.client.post(
             url,
             {"file": _make_image_file(), "capture_datetime": CAPTURE_DT},
@@ -702,5 +708,5 @@ class DicomUploadTests(FileUploadBaseTestCase):
                 {"file": f, "capture_datetime": CAPTURE_DT},
                 format="multipart",
             )
-        self.camera_session.refresh_from_db()
-        self.assertTrue(self.camera_session.is_complete)
+        self.eye_exam_register.refresh_from_db()
+        self.assertTrue(self.eye_exam_register.is_complete)
