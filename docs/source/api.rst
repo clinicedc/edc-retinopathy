@@ -137,7 +137,7 @@ No session exists (404):
 
    {
      "code": "no_session",
-     "error": "No camera session found for this subject. Create one in the EDC before conducting the exam."
+     "error": "No entry found in the Eye Exam Register for this subject. Create one before conducting the exam."
    }
 
 All sessions complete or contraindicated (400):
@@ -146,7 +146,7 @@ All sessions complete or contraindicated (400):
 
    {
      "code": "no_eligible_session",
-     "error": "All sessions for this subject are complete or contraindicated. Create a new camera session in the EDC to upload again."
+     "error": "All sessions for this subject are complete or contraindicated. Create a new entry in the Eye Exam Register to upload again."
    }
 
 

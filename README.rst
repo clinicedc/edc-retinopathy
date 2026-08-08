@@ -6,9 +6,7 @@ edc-retinopathy
 Add a diabetic retinopathy screening form and REST API for integrating
 with a fundus camera in a clinicedc project.
 
-A clinician creates a **EyeExamRegister** in the EDC before the exam.  The
-camera software (``fundus-camera-watchdog``) resolves the subject,
-uploads eye images, DICOM files and reports, then checks status.
+A clinician creates an **EyeExamRegister** instance in the EDC before the exam.  The camera software (``fundus-camera-watchdog``) resolves the subject, uploads eye images, DICOM files and reports, then checks status.
 
 Requires django>=5.2,<6.1 and djangorestframework>=3.16.0
 
@@ -64,6 +62,10 @@ Settings
 
 ``EDC_RETINOPATHY_MAX_FILE_SIZE_MB``
     Maximum upload size in MB (default: 10).
+
+``EDC_RETINOPATHY_VISIT_DATETIME_FILTER``
+    Datetime filter for Call List. If set, filters the list of subjects
+    to those who attended AFTER the given datetime.
 
 See also https://edc-retinopathy.readthedocs.io/en/latest/
 

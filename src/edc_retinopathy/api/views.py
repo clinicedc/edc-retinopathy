@@ -281,7 +281,7 @@ class ResolveSubjectView(APIView):
         if eye_exam_register_obj is None:
             if not qs.exists():
                 logger.warning(
-                    "No camera session for %s (device=%s). "
+                    "No entry in the Eye Exam Registerf for %s (device=%s). "
                     "Create one in the EDC before the exam.",
                     subject_identifier,
                     device_id,
@@ -290,7 +290,7 @@ class ResolveSubjectView(APIView):
                     {
                         "code": "no_session",
                         "error": (
-                            "No camera session found for this subject. "
+                            "No entry found in the Eye Exam Register for this subject. "
                             "Create one in the EDC before conducting "
                             "the exam."
                         ),
@@ -307,8 +307,8 @@ class ResolveSubjectView(APIView):
                     "code": "no_eligible_session",
                     "error": (
                         "All sessions for this subject are complete or "
-                        "contraindicated. Create a new camera session in the "
-                        "EDC to upload again."
+                        "contraindicated. Create a new entry in the Eye Exam Register "
+                        "to upload again."
                     ),
                 },
                 status=status.HTTP_400_BAD_REQUEST,

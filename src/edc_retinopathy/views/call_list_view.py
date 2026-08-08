@@ -1,5 +1,3 @@
-"""View listing registered subjects who have not had a camera session."""
-
 from __future__ import annotations
 
 from datetime import datetime
