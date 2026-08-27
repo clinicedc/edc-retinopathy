@@ -4,10 +4,10 @@ from clinicedc_constants import NO, YES
 from django import forms
 from edc_form_validators import FormValidator, FormValidatorMixin
 
-from ..models import ContactAttempt
+from ..models import CallList
 
 
-class ContactAttemptValidator(FormValidator):
+class CallListValidator(FormValidator):
     def clean(self):
         self.applicable_if(
             YES,
@@ -26,11 +26,11 @@ class ContactAttemptValidator(FormValidator):
         )
 
 
-class ContactAttemptForm(FormValidatorMixin, forms.ModelForm):
-    form_validator_cls = ContactAttemptValidator
+class CallListForm(FormValidatorMixin, forms.ModelForm):
+    form_validator_cls = CallListValidator
 
     class Meta:
-        model = ContactAttempt
+        model = CallList
         fields = (
             "registered_subject",
             "report_datetime",

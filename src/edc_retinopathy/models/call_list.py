@@ -12,7 +12,7 @@ from .model_mixins import IdentityModelMixin
 from .registered_subject_proxy import RegisteredSubjectProxy
 
 
-class ContactAttempt(
+class CallList(
     SiteModelMixin,
     IdentityModelMixin,
     BaseUuidModel,
@@ -20,7 +20,7 @@ class ContactAttempt(
     registered_subject = models.OneToOneField(
         RegisteredSubjectProxy,
         on_delete=models.PROTECT,
-        related_name="contact_attempt",
+        related_name="call_list",
     )
 
     report_datetime = models.DateTimeField(default=timezone.now)

@@ -7,16 +7,16 @@ from edc_model_admin.history import SimpleHistoryAdmin
 from rangefilter.filters import DateRangeFilterBuilder
 
 from ..admin_site import edc_retinopathy_admin
-from ..forms import ContactAttemptForm
-from ..models import ContactAttempt
+from ..forms import CallListForm
+from ..models import CallList
 
 
-@admin.register(ContactAttempt, site=edc_retinopathy_admin)
-class ContactAttemptAdmin(
+@admin.register(CallList, site=edc_retinopathy_admin)
+class CallListAdmin(
     ModelAdminSubjectDashboardMixin,
     SimpleHistoryAdmin,
 ):
-    form = ContactAttemptForm
+    form = CallListForm
 
     show_object_tools: bool = True
     date_hierarchy = "created"
@@ -73,17 +73,17 @@ class ContactAttemptAdmin(
     }
 
     @admin.display(description="Attempts")
-    def attempts(self, obj: ContactAttempt):
+    def attempts(self, obj: CallList):
         return obj.number_of_attempts
 
     @admin.display(description="Contact made")
-    def contact(self, obj: ContactAttempt):
+    def contact(self, obj: CallList):
         return obj.contact_made
 
     @admin.display(description="Agreed to attend")
-    def will_attend(self, obj: ContactAttempt):
+    def will_attend(self, obj: CallList):
         return obj.agreed_to_attend
 
     @admin.display(description="Appt date")
-    def appt_date(self, obj: ContactAttempt):
+    def appt_date(self, obj: CallList):
         return obj.agreed_to_attend_date

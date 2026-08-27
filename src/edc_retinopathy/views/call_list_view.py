@@ -46,7 +46,7 @@ ANNOTATION_FIELDS = (
     "agreed",
     "attend_date",
     "last_attempt",
-    "contact_attempt_pk",
+    "call_list_pk",
 )
 
 REPORT_VALUES = (*RS_FIELDS, *ANNOTATION_FIELDS)
@@ -98,11 +98,11 @@ class CallListView(EdcViewMixin, NavbarViewMixin, ListView):
             RegisteredSubjectProxy.objects.exclude(has_eye_exam_register)
             .annotate(
                 last_visit=last_visit,
-                attempts=F("contact_attempt__number_of_attempts"),
-                last_attempt=F("contact_attempt__report_datetime"),
-                contact_attempt_pk=F("contact_attempt__id"),
-                attend_date=F("contact_attempt__agreed_to_attend_date"),
-                agreed=F("contact_attempt__agreed_to_attend"),
+                attempts=F("call_list__number_of_attempts"),
+                last_attempt=F("call_list__report_datetime"),
+                call_list_pk=F("call_list__id"),
+                attend_date=F("call_list__agreed_to_attend_date"),
+                agreed=F("call_list__agreed_to_attend"),
             )
         )
         if self.filter_by_visit_datetime:
