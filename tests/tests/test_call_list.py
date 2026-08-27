@@ -11,7 +11,7 @@ from django.db.models import QuerySet
 from django.utils import timezone
 from edc_utils import age, get_utcnow
 
-from edc_retinopathy.models import ContactAttempt, RegisteredSubjectProxy
+from edc_retinopathy.models import CallList, RegisteredSubjectProxy
 from edc_retinopathy.views import CallListView
 from edc_retinopathy.views.call_list_view import (
     AGREED_CHOICES,
@@ -31,12 +31,12 @@ class CallListTests(RetinopathyTestCaseMixin):
     def _queryset() -> QuerySet[dict[str, Any]]:
         return CallListView().get_queryset()
 
-    def _create_contact_attempt(
+    def _create_call_list(
         self,
         registered_subject,
         number_of_attempts: int = 3,
-    ) -> ContactAttempt:
-        return ContactAttempt.objects.create(
+    ) -> CallList:
+        return CallList.objects.create(
             registered_subject_id=registered_subject.id,
             report_datetime=timezone.now(),
             number_of_attempts=number_of_attempts,
@@ -77,9 +77,9 @@ class CallListTests(RetinopathyTestCaseMixin):
 
         self.assertEqual(self._queryset().count(), 0)
 
-    def test_contact_attempt_is_annotated(self) -> None:
+    def test_call_list_is_annotated(self) -> None:
         registered_subject = self.create_registered_subject("105-10-0001-2")
-        contact_attempt = self._create_contact_attempt(
+        call_list = self._create_call_list(
             registered_subject,
             number_of_attempts=3,
         )
@@ -87,16 +87,16 @@ class CallListTests(RetinopathyTestCaseMixin):
         row = self._queryset().get()
 
         self.assertEqual(row["attempts"], 3)
-        self.assertEqual(row["contact_attempt_pk"], contact_attempt.id)
-        self.assertEqual(row["last_attempt"], contact_attempt.report_datetime)
+        self.assertEqual(row["call_list_pk"], call_list.id)
+        self.assertEqual(row["last_attempt"], call_list.report_datetime)
 
-    def test_without_contact_attempt_annotations_are_none(self) -> None:
+    def test_without_call_list_annotations_are_none(self) -> None:
         self.create_registered_subject("105-10-0001-2")
 
         row = self._queryset().get()
 
         self.assertIsNone(row["attempts"])
-        self.assertIsNone(row["contact_attempt_pk"])
+        self.assertIsNone(row["call_list_pk"])
         self.assertIsNone(row["last_attempt"])
 
     def test_encrypted_fields_are_not_selected(self) -> None:
@@ -165,7 +165,7 @@ class CallListTests(RetinopathyTestCaseMixin):
         If these drift from the field's choices the dropdown silently
         matches nothing, so pin them to the model.
         """
-        field = ContactAttempt._meta.get_field("agreed_to_attend")
+        field = CallList._meta.get_field("agreed_to_attend")
         valid = {value for value, _ in field.choices}
 
         self.assertTrue(set(AGREED_CHOICES).issubset(valid))
@@ -176,17 +176,17 @@ class CallListTests(RetinopathyTestCaseMixin):
         Rows with no contact attempt render an empty Agreed cell, and the
         filter reads "" as "no filter", so they need their own token.
         """
-        field = ContactAttempt._meta.get_field("agreed_to_attend")
+        field = CallList._meta.get_field("agreed_to_attend")
         valid = {value for value, _ in field.choices}
 
         self.assertEqual(AGREED_FILTER_CHOICES, (*AGREED_CHOICES, NOT_CONTACTED))
         self.assertNotIn(NOT_CONTACTED, valid)
 
-    def test_agreed_is_annotated_from_the_contact_attempt(self) -> None:
+    def test_agreed_is_annotated_from_the_call_list(self) -> None:
         registered_subject = self.create_registered_subject("105-10-0001-2")
-        contact_attempt = self._create_contact_attempt(registered_subject)
-        contact_attempt.agreed_to_attend = YES
-        contact_attempt.save()
+        call_list = self._create_call_list(registered_subject)
+        call_list.agreed_to_attend = YES
+        call_list.save()
 
         row = self._queryset().get()
 

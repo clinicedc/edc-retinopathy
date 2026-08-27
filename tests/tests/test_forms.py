@@ -1,4 +1,4 @@
-"""Tests for ContactAttempt and ReferralFollowup form validators."""
+"""Tests for CallList and ReferralFollowup form validators."""
 
 from __future__ import annotations
 
@@ -9,10 +9,10 @@ from clinicedc_constants import NO, NOT_APPLICABLE, OTHER, YES
 from django import forms
 from django.utils import timezone
 
-from edc_retinopathy.forms.contact_attempt_form import ContactAttemptValidator
+from edc_retinopathy.forms.call_list_form import CallListValidator
 from edc_retinopathy.forms.referral_followup_form import ReferralFollowupValidator
 from edc_retinopathy.models import (
-    ContactAttempt,
+    CallList,
     MissedReferralReasons,
     ReferralFollowup,
 )
@@ -20,8 +20,8 @@ from edc_retinopathy.models import (
 from .mixins import RetinopathyTestCaseMixin
 
 
-class ContactAttemptFormTests(RetinopathyTestCaseMixin):
-    """Tests for ContactAttemptValidator."""
+class CallListFormTests(RetinopathyTestCaseMixin):
+    """Tests for CallListValidator."""
 
     def setUp(self) -> None:
         super().setUp()
@@ -37,9 +37,9 @@ class ContactAttemptFormTests(RetinopathyTestCaseMixin):
         }
 
     def _validate(self, data: dict) -> dict:
-        form = ContactAttemptValidator(
+        form = CallListValidator(
             cleaned_data=data,
-            model=ContactAttempt,
+            model=CallList,
         )
         with contextlib.suppress(forms.ValidationError):
             form.validate()

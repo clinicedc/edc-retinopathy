@@ -1,4 +1,4 @@
-from .contact_attempt import ContactAttempt
+from .call_list import CallList
 from .dm_retinopathy_screening import DmRetinopathyScreening
 from .eye_exam_register import EyeExamRegister
 from .list_models import MissedReferralReasons
@@ -7,7 +7,7 @@ from .registered_subject_proxy import RegisteredSubjectProxy
 from .session_file import SessionFile
 
 __all__ = [
-    "ContactAttempt",
+    "CallList",
     "DmRetinopathyScreening",
     "EyeExamRegister",
     "MissedReferralReasons",
