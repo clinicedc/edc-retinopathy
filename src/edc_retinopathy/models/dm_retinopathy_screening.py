@@ -12,7 +12,6 @@ from .eye_exam_register import EyeExamRegister
 
 
 def evaluation_fields_factory_mixin(laterality: str) -> type[models.Model]:
-
     class AbstractModel(models.Model):
         class Meta:
             abstract = True
@@ -102,12 +101,15 @@ class DmRetinopathyScreening(
     subject_identifier = models.CharField(max_length=50, null=True, editable=False)
 
     interpreted_by = models.CharField(
-        max_length=150, help_text="Name or ID of the reading Ophthalmologist"
+        max_length=150,
+        help_text="Name or ID of the reading Ophthalmologist",
     )
 
     # --- Section 1: Image Quality Assessment ---
     image_quality = models.CharField(
-        max_length=20, choices=ImageQuality.choices, default=ImageQuality.ACCESSIBLE
+        max_length=20,
+        choices=ImageQuality.choices,
+        default=ImageQuality.ACCESSIBLE,
     )
     limitation_cataract = models.CharField(
         verbose_name="Cataract / Media Opacity",

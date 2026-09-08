@@ -98,7 +98,6 @@ class EyeExamRegisterModelTests(RetinopathyTestCaseMixin):
         self.assertIsNone(eye_exam_register.contraindicated)
 
     def test_contraindicated_true(self) -> None:
-
         rs = self.create_registered_subject()
         eye_exam_register = self.create_eye_exam_register(rs, visual_impairment=YES)
         self.assertTrue(eye_exam_register.contraindicated)

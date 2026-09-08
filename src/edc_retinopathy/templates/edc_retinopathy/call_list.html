@@ -95,19 +95,19 @@
                     </td>
                     <td>{{ registered_subject.age_in_years|default_if_none:"" }}{{ registered_subject.gender }}</td>
                     <td>
-                        {% if registered_subject.contact_attempt_pk %}
-                        <a href="{% url 'edc_retinopathy_admin:edc_retinopathy_contactattempt_change' registered_subject.contact_attempt_pk %}?next=edc_retinopathy:call-list"
+                        {% if registered_subject.call_list_pk %}
+                        <a href="{% url 'edc_retinopathy_admin:edc_retinopathy_calllist_change' registered_subject.call_list_pk %}?next=edc_retinopathy:call-list"
                            class="btn btn-sm btn-success">
                             <i class="fas fa-phone fa-fw"></i> Log ({{ registered_subject.attempts }})</a>
                         {% else %}
-                        <a href="{% url 'edc_retinopathy_admin:edc_retinopathy_contactattempt_add' %}?registered_subject={{ registered_subject.id }}&amp;next=edc_retinopathy:call-list"
+                        <a href="{% url 'edc_retinopathy_admin:edc_retinopathy_calllist_add' %}?registered_subject={{ registered_subject.id }}&amp;next=edc_retinopathy:call-list"
                            class="btn btn-sm btn-warning">
                             <i class="fas fa-phone fa-fw"></i> Log</a>
                         {% endif %}
                     </td>
                     <td data-order="{{ registered_subject.attempts|default_if_none:'-1' }}"
-                        data-search="{% if registered_subject.contact_attempt_pk %}{{ registered_subject.agreed|default_if_none:'' }}{% else %}{{ not_contacted }}{% endif %}">
-                        {% if registered_subject.contact_attempt_pk %}{{ registered_subject.agreed }}{% endif %}
+                        data-search="{% if registered_subject.call_list_pk %}{{ registered_subject.agreed|default_if_none:'' }}{% else %}{{ not_contacted }}{% endif %}">
+                        {% if registered_subject.call_list_pk %}{{ registered_subject.agreed }}{% endif %}
                     </td>
                     <td data-order="{{ registered_subject.attend_date|date:'U' }}">
                         {{ registered_subject.attend_date|date:"Y-m-d"|default:"" }}

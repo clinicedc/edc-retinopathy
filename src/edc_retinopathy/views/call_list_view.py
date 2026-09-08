@@ -94,16 +94,13 @@ class CallListView(EdcViewMixin, NavbarViewMixin, ListView):
             .values("report_datetime")[:1],
             output_field=DateTimeField(),
         )
-        qs = (
-            RegisteredSubjectProxy.objects.exclude(has_eye_exam_register)
-            .annotate(
-                last_visit=last_visit,
-                attempts=F("call_list__number_of_attempts"),
-                last_attempt=F("call_list__report_datetime"),
-                call_list_pk=F("call_list__id"),
-                attend_date=F("call_list__agreed_to_attend_date"),
-                agreed=F("call_list__agreed_to_attend"),
-            )
+        qs = RegisteredSubjectProxy.objects.exclude(has_eye_exam_register).annotate(
+            last_visit=last_visit,
+            attempts=F("call_list__number_of_attempts"),
+            last_attempt=F("call_list__report_datetime"),
+            call_list_pk=F("call_list__id"),
+            attend_date=F("call_list__agreed_to_attend_date"),
+            agreed=F("call_list__agreed_to_attend"),
         )
         if self.filter_by_visit_datetime:
             qs = qs.filter(last_visit__gte=self.filter_by_visit_datetime)

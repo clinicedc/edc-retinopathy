@@ -365,7 +365,7 @@ Data Model
 ==========
 
 EyeExamRegister
--------------
+---------------
 
 Created by the clinician in the EDC before the exam.  Links to
 ``RegisteredSubject`` and stores screening fields.

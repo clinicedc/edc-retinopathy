@@ -91,7 +91,8 @@ class LeftEyeUploadTests(FileUploadBaseTestCase):
         self.assertEqual(response.status_code, 201)
         self.assertEqual(response.data["file_type"], "left")
         self.assertEqual(
-            str(response.data["eye_exam_register_id"]), str(self.eye_exam_register.pk)
+            str(response.data["eye_exam_register_id"]),
+            str(self.eye_exam_register.pk),
         )
         self.assertEqual(SessionFile.objects.count(), 1)
 
@@ -699,10 +700,7 @@ class DicomUploadTests(FileUploadBaseTestCase):
     def test_dicom_does_not_affect_is_complete(self) -> None:
         """DICOM uploads are supplementary — session completes without them."""
         for ft in ("left", "right", "report"):
-            if ft == "report":
-                f = _make_pdf_file()
-            else:
-                f = _make_image_file(name=f"{ft}.jpg")
+            f = _make_pdf_file() if ft == "report" else _make_image_file(name=f"{ft}.jpg")
             self.client.post(
                 self._upload_url(ft),
                 {"file": f, "capture_datetime": CAPTURE_DT},

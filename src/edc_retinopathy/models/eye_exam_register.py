@@ -114,7 +114,8 @@ class EyeExamRegister(
     )
 
     op_comment = models.TextField(
-        verbose_name="Ophthalmologist's comment", default=NULL_STRING
+        verbose_name="Ophthalmologist's comment",
+        default=NULL_STRING,
     )
 
     op_referral = models.CharField(
