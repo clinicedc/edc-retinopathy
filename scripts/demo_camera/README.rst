@@ -93,12 +93,12 @@ What it does
 
 The script executes the camera's protocol in order:
 
-0. **Ping** — verifies the server is reachable and the token is valid.
-1. **Resolve** — looks up the subject and creates (or reactivates) a session.
-2. **Upload left eye** — sends a JPEG image with capture datetime.
-3. **Upload right eye** — sends a JPEG image with capture datetime.
-4. **Upload report** — sends the PDF analysis report.
-5. **Status** — confirms the session is complete.
+1. **Ping** — verifies the server is reachable and the token is valid.
+2. **Resolve** — looks up the subject and creates (or reactivates) a session.
+3. **Upload left eye** — sends a JPEG image with capture datetime.
+4. **Upload right eye** — sends a JPEG image with capture datetime.
+5. **Upload report** — sends the PDF analysis report.
+6. **Status** — confirms the session is complete.
 
 Each step prints its result. The script exits on the first failure
 (except upload failures, which are logged and skipped).

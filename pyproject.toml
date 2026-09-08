@@ -86,3 +86,6 @@ select = [
     "UP",
     "W",
 ]
+
+[tool.rstcheck]
+report_level = "WARNING"

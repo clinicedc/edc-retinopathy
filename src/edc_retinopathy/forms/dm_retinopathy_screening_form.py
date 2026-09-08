@@ -13,12 +13,11 @@ class DmRetinopathyScreeningValidator(FormValidator):
         od = self.cleaned_data.get("od_macular_involvement")
         os_ = self.cleaned_data.get("os_macular_involvement")
         dme = self.cleaned_data.get("dme_suspected")
-        if (od == YES or os_ == YES) and dme != YES:
+        if (YES in (od, os_)) and dme != YES:
             self.raise_validation_error(
                 {
                     "dme_suspected": (
-                        "Expected Yes. Macular involvement is "
-                        "indicated in at least one eye."
+                        "Expected Yes. Macular involvement is indicated in at least one eye."
                     ),
                 },
             )
@@ -31,8 +30,7 @@ class DmRetinopathyScreeningValidator(FormValidator):
                 self.raise_validation_error(
                     {
                         "final_severity_grade": (
-                            "Expected 'Ungradable'. Image quality is "
-                            "marked as ungradable."
+                            "Expected 'Ungradable'. Image quality is marked as ungradable."
                         ),
                     },
                 )

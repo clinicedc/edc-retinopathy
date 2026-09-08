@@ -44,7 +44,7 @@ def convert_dicom_to_jpeg(dicom_path: Path, output_path: Path) -> bool:
         arr = arr.astype(np.uint8)
 
         # Handle color vs grayscale
-        if arr.ndim == 2:
+        if arr.ndim == 2:  # noqa: PLR2004
             img = Image.fromarray(arr, mode="L")
         elif arr.ndim == 3 and arr.shape[2] == 3:  # noqa: PLR2004
             img = Image.fromarray(arr, mode="RGB")

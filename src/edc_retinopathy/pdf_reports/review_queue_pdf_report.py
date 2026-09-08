@@ -119,8 +119,8 @@ class ReviewQueueReport(Report):
                                 fontName="Helvetica-Bold",
                             ),
                         ),
-                    ]
-                ]
+                    ],
+                ],
             ),
             Spacer(0.1 * cm, 0.4 * cm),
         ]
@@ -174,8 +174,8 @@ class ReviewQueueReport(Report):
                     ("BACKGROUND", (0, last), (-1, last), _ALT_ROW),
                     ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
                     ("FONTSIZE", (0, 0), (-1, -1), 7),
-                ]
-            )
+                ],
+            ),
         )
         return table
 
@@ -263,7 +263,7 @@ class ReviewQueueReport(Report):
                     ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
                     ("FONTSIZE", (0, 1), (-1, -1), 7),
                     ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, _ALT_ROW]),
-                ]
-            )
+                ],
+            ),
         )
         return table

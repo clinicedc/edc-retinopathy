@@ -54,7 +54,7 @@ def _get_max_file_size_bytes() -> int:
     return int(mb * 1024 * 1024)
 
 
-def _validate_file_content(uploaded_file, file_type: str) -> str | None:
+def _validate_file_content(uploaded_file, file_type: str) -> str | None:  # noqa: PLR0911
     """Basic magic-byte validation. Returns error message or None."""
     if file_type in _DICOM_FILE_TYPES:
         # DICOM: 128-byte preamble then "DICM"
@@ -566,7 +566,7 @@ class FileUploadView(APIView):
                         f"{eye_exam_register_obj.pk}/previews/{preview_name}"
                     )
                     session_file.save(update_fields=["preview_filename"])
-            except Exception:  # noqa: BLE001
+            except Exception:
                 logger.exception(
                     "DICOM preview generation failed for %s session=%s — "
                     "upload accepted without preview",

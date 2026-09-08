@@ -17,7 +17,7 @@ class ReviewDetailView(EdcViewMixin, NavbarViewMixin, DetailView):
     context_object_name = "eye_exam_register"
     navbar_selected_item = "edc_lab_results"
 
-    def get_object(self, queryset=None):
+    def get_object(self, queryset=None):  # noqa: ARG002
         return get_object_or_404(EyeExamRegister, pk=self.kwargs["session_pk"])
 
     def get_context_data(self, **kwargs):
