@@ -345,7 +345,9 @@ class SessionStatusView(APIView):
     """Return the current eye_exam_register_obj status for a subject.
 
     GET /api/retinopathy/<subject_identifier>/status/
-    Returns the most recent eye_exam_register_obj and which file types have been received.
+    Returns the most recent eye_exam_register_obj and which file types have been
+    received. Each eye counts as received once its DICOM or its image has
+    arrived, so ``missing`` names the DICOM even though either satisfies it.
     """
 
     authentication_classes = (TokenAuthentication,)
@@ -372,17 +374,17 @@ class SessionStatusView(APIView):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
-        uploaded = set(eye_exam_register_obj.files.values_list("file_type", flat=True))
-        expected = eye_exam_register_obj.expected_file_types
+        uploaded = eye_exam_register_obj.files.values_list("file_type", flat=True)
+        missing = eye_exam_register_obj.missing_file_types
 
         return Response(
             {
                 "eye_exam_register_id": eye_exam_register_obj.pk,
                 "subject_identifier": eye_exam_register_obj.subject_identifier,
                 "report_datetime": eye_exam_register_obj.report_datetime.isoformat(),
-                "uploaded": sorted(uploaded),
-                "missing": sorted(expected - uploaded),
-                "complete": eye_exam_register_obj.is_complete,
+                "uploaded": sorted(set(uploaded)),
+                "missing": missing,
+                "complete": not missing,
             },
             status=status.HTTP_200_OK,
         )
