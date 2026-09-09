@@ -172,7 +172,7 @@ Success response (200)
      "eye_exam_register_id": "f8e7d6c5-b4a3-2190-fedc-ba9876543210",
      "subject_identifier": "105-10-0001-2",
      "report_datetime": "2026-05-21T10:15:30.123456+00:00",
-     "uploaded": ["left", "right"],
+     "uploaded": ["left_dicom", "right_dicom"],
      "missing": ["report"],
      "complete": false
    }
@@ -401,10 +401,18 @@ Created by the clinician in the EDC before the exam.  Links to
 
 Properties:
 
-- ``expected_file_types`` -- the set of file types required for
-  completeness (depends on ``report_type``).
-- ``is_complete`` -- True when all expected file types have been
-  uploaded.
+- ``required_file_types`` -- the file types required for completeness,
+  grouped, one group per requirement. Any one file type in a group
+  satisfies it: an eye is satisfied by its DICOM or its image. The
+  report requirement depends on ``report_type``.
+- ``expected_file_types`` -- the preferred file type of each
+  requirement, that is ``left_dicom``, ``right_dicom`` and the
+  report(s).
+- ``missing_file_types`` -- the preferred file type of each
+  requirement not yet satisfied. Reported as ``missing`` by the status
+  endpoint, so it names the DICOM for an eye even though the image
+  would also satisfy it.
+- ``is_complete`` -- True when nothing is missing.
 - ``contraindicated`` -- True if any screening field is Yes.
 
 SessionFile

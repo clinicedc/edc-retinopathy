@@ -57,6 +57,12 @@ class FullWorkflowTests(RetinopathyTestCaseMixin):
                 content=b"%PDF-1.4" + b"\x00" * 200,
                 content_type="application/pdf",
             )
+        elif file_type in ("left_dicom", "right_dicom"):
+            f = SimpleUploadedFile(
+                name=f"{file_type}.dcm",
+                content=b"\x00" * 128 + b"DICM" + b"\x00" * 200,
+                content_type="application/dicom",
+            )
         else:
             f = SimpleUploadedFile(
                 name=f"{file_type}_eye.jpg",
@@ -121,6 +127,24 @@ class FullWorkflowTests(RetinopathyTestCaseMixin):
         status_resp = self.client.get(
             "/api/retinopathy/105-10-0001-2/status/",
         )
+        self.assertTrue(status_resp.data["complete"])
+
+    def test_full_workflow_dicoms(self) -> None:
+        """The camera default: two DICOMs and one report, and no images."""
+        session = self.create_eye_exam_register(
+            self.rs,
+            report_type=REPORT_TYPE_COMBINED,
+        )
+        self._resolve()
+
+        for ft in ("left_dicom", "right_dicom", "report"):
+            data = self._upload("105-10-0001-2", ft)
+            self.assertEqual(str(data["eye_exam_register_id"]), str(session.pk))
+
+        status_resp = self.client.get(
+            "/api/retinopathy/105-10-0001-2/status/",
+        )
+        self.assertEqual(status_resp.data["missing"], [])
         self.assertTrue(status_resp.data["complete"])
 
     def test_full_workflow_per_eye(self) -> None:

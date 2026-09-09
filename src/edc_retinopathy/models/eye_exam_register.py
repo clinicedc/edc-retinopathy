@@ -11,11 +11,13 @@ from edc_sites.model_mixins import SiteModelMixin
 
 from ..choices import REPORT_TYPE_CHOICES
 from ..constants import (
+    LEFT_DICOM,
     LEFT_EYE,
     LEFT_REPORT,
     REPORT,
     REPORT_TYPE_COMBINED,
     REPORT_TYPE_PER_EYE,
+    RIGHT_DICOM,
     RIGHT_EYE,
     RIGHT_REPORT,
 )
@@ -149,17 +151,39 @@ class EyeExamRegister(
     history = HistoricalRecords(inherit=True)
 
     @property
-    def expected_file_types(self) -> frozenset[str]:
-        """Return the set of file types required for this session."""
+    def required_file_types(self) -> tuple[tuple[str, ...], ...]:
+        """Return the file types required for this exam, grouped.
+
+        Any one file type in a group satisfies that group. The first
+        item is the preferred type, the one named when the group is
+        unsatisfied.
+
+        An eye is satisfied by its DICOM or its image. The review pages
+        read the DICOMs, and that is what the camera sends by default,
+        but a camera may be configured to send images only.
+        """
+        eyes = ((LEFT_DICOM, LEFT_EYE), (RIGHT_DICOM, RIGHT_EYE))
         if self.report_type == REPORT_TYPE_PER_EYE:
-            return frozenset({LEFT_EYE, RIGHT_EYE, LEFT_REPORT, RIGHT_REPORT})
-        return frozenset({LEFT_EYE, RIGHT_EYE, REPORT})
+            return (*eyes, (LEFT_REPORT,), (RIGHT_REPORT,))
+        return (*eyes, (REPORT,))
+
+    @property
+    def expected_file_types(self) -> frozenset[str]:
+        """Return the preferred file type of each requirement."""
+        return frozenset(group[0] for group in self.required_file_types)
+
+    @property
+    def missing_file_types(self) -> list[str]:
+        """Return the preferred file type of each unsatisfied requirement."""
+        uploaded = set(self.files.values_list("file_type", flat=True))
+        return sorted(
+            group[0] for group in self.required_file_types if not uploaded.intersection(group)
+        )
 
     @property
     def is_complete(self) -> bool:
-        """Return True if all expected files have been uploaded."""
-        uploaded = set(self.files.values_list("file_type", flat=True))
-        return self.expected_file_types.issubset(uploaded)
+        """Return True if every required file type has been uploaded."""
+        return not self.missing_file_types
 
     @property
     def contraindicated(self) -> bool | None:
