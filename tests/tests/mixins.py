@@ -13,7 +13,7 @@ from rest_framework.authtoken.models import Token
 from rest_framework.test import APIClient
 
 from edc_retinopathy.constants import REPORT_TYPE_COMBINED
-from edc_retinopathy.models import EyeExamRegister
+from edc_retinopathy.models import EyeExamRegister, SessionFile
 
 
 class RetinopathyTestCaseMixin(TestCase):
@@ -67,3 +67,22 @@ class RetinopathyTestCaseMixin(TestCase):
         }
         defaults.update(kwargs)
         return EyeExamRegister.objects.create(**defaults)
+
+    def create_session_file(
+        self,
+        eye_exam_register: EyeExamRegister,
+        file_type: str,
+        original_filename: str | None = None,
+        **kwargs,
+    ) -> SessionFile:
+        original_filename = original_filename or f"{file_type}.ext"
+        defaults = {
+            "eye_exam_register": eye_exam_register,
+            "file_type": file_type,
+            "original_filename": original_filename,
+            "stored_filename": f"{eye_exam_register.pk}/{original_filename}",
+            "file_size": 1024,
+            "capture_datetime": timezone.now(),
+        }
+        defaults.update(kwargs)
+        return SessionFile.objects.create(**defaults)

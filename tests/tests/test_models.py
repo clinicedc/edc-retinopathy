@@ -46,7 +46,7 @@ class EyeExamRegisterModelTests(RetinopathyTestCaseMixin):
         session = self.create_eye_exam_register(rs, report_type=REPORT_TYPE_COMBINED)
         self.assertEqual(
             session.expected_file_types,
-            frozenset({"left", "right", "report"}),
+            frozenset({"left_dicom", "right_dicom", "report"}),
         )
 
     def test_expected_file_types_per_eye(self) -> None:
@@ -54,10 +54,64 @@ class EyeExamRegisterModelTests(RetinopathyTestCaseMixin):
         session = self.create_eye_exam_register(rs, report_type=REPORT_TYPE_PER_EYE)
         self.assertEqual(
             session.expected_file_types,
-            frozenset({"left", "right", "left_report", "right_report"}),
+            frozenset({"left_dicom", "right_dicom", "left_report", "right_report"}),
         )
 
-    def test_is_complete_combined(self) -> None:
+    def test_an_eye_takes_the_dicom_or_the_image(self) -> None:
+        """Either file type satisfies an eye, so neither is listed once one arrives."""
+        rs = self.create_registered_subject()
+        eye_exam_register = self.create_eye_exam_register(
+            rs,
+            report_type=REPORT_TYPE_COMBINED,
+        )
+        self.assertEqual(
+            eye_exam_register.missing_file_types,
+            ["left_dicom", "report", "right_dicom"],
+        )
+        self.create_session_file(eye_exam_register, "left_dicom")
+        self.create_session_file(eye_exam_register, "right")
+        self.assertEqual(
+            eye_exam_register.missing_file_types,
+            ["report"],
+        )
+
+    def test_is_complete_with_dicoms_only(self) -> None:
+        """The camera default sends DICOMs and a report, and no images."""
+        rs = self.create_registered_subject()
+        eye_exam_register = self.create_eye_exam_register(
+            rs,
+            report_type=REPORT_TYPE_COMBINED,
+        )
+        for ft in ("left_dicom", "right_dicom", "report"):
+            self.create_session_file(eye_exam_register, ft)
+        self.assertEqual(eye_exam_register.missing_file_types, [])
+        self.assertTrue(eye_exam_register.is_complete)
+
+    def test_is_not_complete_without_a_report(self) -> None:
+        rs = self.create_registered_subject()
+        eye_exam_register = self.create_eye_exam_register(
+            rs,
+            report_type=REPORT_TYPE_COMBINED,
+        )
+        for ft in ("left_dicom", "right_dicom"):
+            self.create_session_file(eye_exam_register, ft)
+        self.assertFalse(eye_exam_register.is_complete)
+
+    def test_is_not_complete_with_one_eye_twice(self) -> None:
+        """Two files for one eye leave the other eye outstanding."""
+        rs = self.create_registered_subject()
+        eye_exam_register = self.create_eye_exam_register(
+            rs,
+            report_type=REPORT_TYPE_COMBINED,
+        )
+        self.create_session_file(eye_exam_register, "left_dicom", "a.dcm")
+        self.create_session_file(eye_exam_register, "left", "a.jpg")
+        self.create_session_file(eye_exam_register, "report", "r.html")
+        self.assertEqual(eye_exam_register.missing_file_types, ["right_dicom"])
+        self.assertFalse(eye_exam_register.is_complete)
+
+    def test_is_complete_combined_with_images(self) -> None:
+        """A camera sending images and no DICOMs still completes."""
         rs = self.create_registered_subject()
         eye_exam_register = self.create_eye_exam_register(rs, report_type=REPORT_TYPE_COMBINED)
         self.assertFalse(eye_exam_register.is_complete)

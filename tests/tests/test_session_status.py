@@ -37,7 +37,7 @@ class SessionStatusTests(RetinopathyTestCaseMixin):
         self.assertEqual(response.data["uploaded"], [])
         self.assertEqual(
             sorted(response.data["missing"]),
-            ["left", "report", "right"],
+            ["left_dicom", "report", "right_dicom"],
         )
         self.assertFalse(response.data["complete"])
 
@@ -52,7 +52,7 @@ class SessionStatusTests(RetinopathyTestCaseMixin):
         self.assertEqual(str(response.data["eye_exam_register_id"]), str(eye_exam_register.pk))
         self.assertEqual(
             sorted(response.data["missing"]),
-            ["left", "left_report", "right", "right_report"],
+            ["left_dicom", "left_report", "right_dicom", "right_report"],
         )
 
     def test_status_partial_uploads(self) -> None:
@@ -74,9 +74,22 @@ class SessionStatusTests(RetinopathyTestCaseMixin):
         self.assertEqual(response.data["uploaded"], ["left"])
         self.assertEqual(
             sorted(response.data["missing"]),
-            ["report", "right"],
+            ["report", "right_dicom"],
         )
         self.assertFalse(response.data["complete"])
+
+    def test_status_complete_session_dicoms(self) -> None:
+        """DICOMs and a report complete the exam, which is the camera default."""
+        eye_exam_register = self.create_eye_exam_register(
+            self.rs,
+            report_type=REPORT_TYPE_COMBINED,
+        )
+        for ft in ("left_dicom", "right_dicom", "report"):
+            self.create_session_file(eye_exam_register, ft)
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["missing"], [])
+        self.assertTrue(response.data["complete"])
 
     def test_status_complete_session_combined(self) -> None:
         """Returns complete=True when all combined file types uploaded."""
