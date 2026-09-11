@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, time
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from clinicedc_constants import NO, NOT_APPLICABLE, YES
 from django.apps import apps as django_apps
@@ -15,10 +16,7 @@ from edc_visit_tracking.constants import MISSED_VISIT
 
 from ..models import EyeExamRegister, RegisteredSubjectProxy
 
-# Columns read from RegisteredSubject. It carries six encrypted fields
-# (first_name, last_name, full_name, familiar_name, initials, identity) and
-# each is decrypted per row when a model instance is materialized, so the
-# report selects values() and no encrypted column may be listed here.
+# Columns read from RegisteredSubject
 RS_FIELDS = (
     "id",
     "subject_identifier",
@@ -27,19 +25,12 @@ RS_FIELDS = (
     "dob",
 )
 
-# Options for the "Agreed" column filter. Taken from the constants rather than
-# hardcoded in the template, since the DataTables filter is an exact match
-# against the raw value rendered in the cell.
 AGREED_CHOICES = (YES, NO, NOT_APPLICABLE)
 
-# Subjects never contacted have no contact attempt, so the Agreed cell renders
-# empty. The filter reads "" as "no filter", so those rows need a token of
-# their own to be selectable. Rendered into data-search, never displayed.
 NOT_CONTACTED = "Not contacted"
 
 AGREED_FILTER_CHOICES = (*AGREED_CHOICES, NOT_CONTACTED)
 
-# Added by get_queryset().
 ANNOTATION_FIELDS = (
     "last_visit",
     "attempts",
@@ -127,4 +118,8 @@ class CallListView(EdcViewMixin, NavbarViewMixin, ListView):
 
         See get_queryset().
         """
-        return getattr(settings, "EDC_RETINOPATHY_VISIT_DATETIME_FILTER", None)
+        dte: datetime | None = getattr(settings, "EDC_RETINOPATHY_VISIT_DATETIME_FILTER", None)
+        if dte:
+            # keep the exact calendar year, month, and day, ignore offset
+            return datetime.combine(dte.date(), time.min, tzinfo=ZoneInfo("UTC"))
+        return None
