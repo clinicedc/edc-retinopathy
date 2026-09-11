@@ -7,7 +7,7 @@ from django.db.models import Count, Exists, OuterRef, Q
 from django.utils import timezone
 from django.utils.timezone import localtime
 from edc_pdf_reports import Report
-from edc_protocol.research_protocol_config import ResearchProtocolConfig
+from edc_protocol.trial_settings import trial_settings
 from edc_sites.site import sites
 from edc_utils.date import to_local
 from reportlab.lib import colors
@@ -70,7 +70,7 @@ class ReviewQueueReport(Report):
     """
 
     def __init__(self, **kwargs):
-        self.protocol_name = ResearchProtocolConfig().protocol_name
+        self.protocol_name = trial_settings.protocol_name
         super().__init__(**kwargs)
 
     def on_first_page(self, canvas, doc):

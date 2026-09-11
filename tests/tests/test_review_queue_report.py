@@ -7,6 +7,7 @@ from io import BytesIO
 
 from django.test import override_settings
 from django.utils import timezone
+from multisite import SiteID
 
 from edc_retinopathy.models import DmRetinopathyScreening, SessionFile
 from edc_retinopathy.pdf_reports import ReviewQueueReport
@@ -18,7 +19,7 @@ from edc_retinopathy.pdf_reports.review_queue_pdf_report import (
 from .mixins import RetinopathyTestCaseMixin
 
 
-@override_settings(SITE_ID=10)
+@override_settings(SITE_ID=SiteID(10))
 class ReviewQueueReportTests(RetinopathyTestCaseMixin):
     """Tests for ReviewQueueReport."""
 

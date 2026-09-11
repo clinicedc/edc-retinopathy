@@ -11,6 +11,7 @@ from rangefilter.filters import DateRangeFilterBuilder
 from ..admin_site import edc_retinopathy_admin
 from ..forms import EyeExamRegisterForm
 from ..models import EyeExamRegister
+from .list_filters import FileCountListFilter
 
 
 @admin.register(EyeExamRegister, site=edc_retinopathy_admin)
@@ -85,7 +86,12 @@ class EyeExamRegisterAdmin(
         "created",
     )
 
-    list_filter = (("report_datetime", DateRangeFilterBuilder()), "device_id", "site")
+    list_filter = (
+        ("report_datetime", DateRangeFilterBuilder()),
+        FileCountListFilter,
+        "device_id",
+        "site",
+    )
 
     search_fields = ("registered_subject__subject_identifier",)
 
