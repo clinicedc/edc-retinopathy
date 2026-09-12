@@ -1,23 +1,22 @@
 [project]
 name = "edc-retinopathy"
-version = "1.2.1"
+version = "1.3.0"
 description = "Add a diabetic retinopathy screening form and API to use with a fundus camera for clinicedc"
 readme = "README.rst"
 requires-python = ">=3.12,<3.15"
 dependencies = [
-    "clinicedc>=4.0.0",
+    "clinicedc>=4.9.0",
     "django>=5.2,<6.1",
     "djangorestframework>=3.16.0",
     "djangorestframework-stubs>=3.17.0",
     "pillow>=11.0",
     "pydicom>=3.0",
-    "ruff>=0.15.15",
     "watchdog>=6.0.0",
 ]
 
 [dependency-groups]
 dev = [
-    "clinicedc-tests>=1.2.2",
+    "clinicedc-tests>=1.4.1",
     "ruff>=0.15.15",
     "sphinx>=9.1.0",
 ]
@@ -26,7 +25,7 @@ dev = [
 Homepage = "https://github.com/clinicedc/edc-retinopathy"
 
 [build-system]
-requires = ["uv_build>=0.11.16,<0.12.0"]
+requires = ["uv_build>=0.11.16,<0.13.0"]
 build-backend = "uv_build"
 
 [tool.uv.build-backend]
